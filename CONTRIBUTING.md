@@ -44,6 +44,11 @@ Thank you for your interest in contributing to **diff_and_compare_tool**!
 - Do not commit hardcoded absolute paths, credentials, or personal identification.
 - Keep commits focused and provide descriptive commit messages.
 
+## Questions & Community Discussions
+
+Have a question, feedback, or feature idea?
+Head over to [GitHub Discussions](https://github.com/vikrantblu/diff_and_compare_tool/discussions) to ask questions, propose ideas, or connect with the maintainers without needing to open an issue.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the project's [MIT License](LICENSE).

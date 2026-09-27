@@ -7,6 +7,7 @@ A high-performance, cross-platform file comparison, 3-way merge, and multi-forma
 ![Framework](https://img.shields.io/badge/UI-PySide6%20Qt6-blueviolet)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-vikrantblu%2Fdiff__and__compare__tool-blue?logo=github)](https://github.com/vikrantblu/diff_and_compare_tool)
+[![Discussions](https://img.shields.io/badge/Discussions-Join%20Chat-teal?logo=github)](https://github.com/vikrantblu/diff_and_compare_tool/discussions)
 
 ---
 
