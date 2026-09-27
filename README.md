@@ -2,6 +2,8 @@
 
 A high-performance, cross-platform file comparison, 3-way merge, and multi-format data synchronization desktop suite built with Python (PySide6) and modern Windows 11 Fluent design principles.
 
+[![CI Test Suite](https://github.com/vikrantblu/diff_and_compare_tool/actions/workflows/test.yml/badge.svg)](https://github.com/vikrantblu/diff_and_compare_tool/actions/workflows/test.yml)
+[![CodeQL Analysis](https://github.com/vikrantblu/diff_and_compare_tool/actions/workflows/codeql.yml/badge.svg)](https://github.com/vikrantblu/diff_and_compare_tool/actions/workflows/codeql.yml)
 ![Application Status](https://img.shields.io/badge/Platform-Windows%2011%20x64%20Standalone-blue)
 ![Python](https://img.shields.io/badge/Python-3.11+-brightgreen)
 ![Framework](https://img.shields.io/badge/UI-PySide6%20Qt6-blueviolet)
@@ -224,5 +226,21 @@ Even if you cannot sponsor financially, you can support the project by:
 - ⭐ **Starring the repository** on GitHub.
 - 📢 Sharing it with colleagues and developer communities.
 - 💬 Joining [GitHub Discussions](https://github.com/vikrantblu/diff_and_compare_tool/discussions) and submitting feedback or pull requests!
+
+---
+
+## 🤝 Contributing & Community
+
+Contributions are welcomed!
+- Please read our [Contributing Guide](CONTRIBUTING.md) for details on code style, architecture, and testing.
+- Please review our [Code of Conduct](CODE_OF_CONDUCT.md) for community guidelines.
+- To report a security vulnerability, refer to our [Security Policy](SECURITY.md).
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
 
 

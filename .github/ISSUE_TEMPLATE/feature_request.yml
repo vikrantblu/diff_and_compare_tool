@@ -1,0 +1,49 @@
+name: Feature Request
+description: Propose an enhancement, new comparison mode, or parser support
+title: "[FEAT]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an enhancement to diff_and_compare_tool!
+  - type: dropdown
+    id: studio
+    attributes:
+      label: Targeted Studio / Component
+      description: Where does this feature belong?
+      options:
+        - 2-Way Text / Code Diff (Tree-sitter AST, alignments)
+        - 3-Way Merge Studio (Conflict resolution, AI)
+        - Folder & Archive Comparison / Sync Hub
+        - Visual Media & PDF Diff
+        - Tabular / Spreadsheet Diff (Excel/Parquet/CSV/SQLite)
+        - Hex / Binary Diff
+        - Structured Data Diff (JSON/YAML/XML)
+        - Shell Integration / CLI / Automation
+        - Core Performance (BLAKE3, Mmap, Virtualization)
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Motivation
+      description: Is your feature related to a current limitation or workflow bottleneck?
+      placeholder: I am trying to [...] but currently [...]
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Feature / Solution
+      description: How should the feature work? Include UI layout ideas or workflow steps.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any other tools, libraries, or workarounds you considered.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any sample files, diagrams, or external references.
