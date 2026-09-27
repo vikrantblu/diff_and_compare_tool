@@ -1,1 +1,10 @@
-test funding.yml
+# These are supported funding model platforms for diff_and_compare_tool
+
+github: [vikrantblu]
+# patreon: # Replace with your Patreon username
+# open_collective: # Replace with your Open Collective username
+# ko_fi: # Replace with your Ko-fi username
+# buy_me_a_coffee: # Replace with your Buy Me a Coffee username
+# liberapay: # Replace with your Liberapay username
+# polar: # Replace with your Polar username
+# custom: ['https://example.com/donate']
