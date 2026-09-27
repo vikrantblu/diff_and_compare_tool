@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+
+    <!-- Left Card Gradient -->
+    <linearGradient id="leftGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Right Card Gradient -->
+    <linearGradient id="rightGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+
+    <!-- Center Badge Gradient -->
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+
+    <!-- Drop Shadows -->
+    <filter id="outerShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#000000" flood-opacity="0.55" />
+    </filter>
+
+    <filter id="badgeShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+  </defs>
+
+  <!-- Outer Squircle Container -->
+  <rect x="80" y="80" width="864" height="864" rx="200" ry="200" fill="url(#bgGrad)" filter="url(#outerShadow)" stroke="#38bdf8" stroke-width="4" stroke-opacity="0.5" />
+
+  <!-- Left Comparison Pane (Blue) -->
+  <g id="leftPane">
+    <rect x="160" y="200" width="320" height="624" rx="48" fill="url(#leftGrad)" stroke="#38bdf8" stroke-width="6" stroke-opacity="0.8" />
+    <!-- Header -->
+    <circle cx="198" cy="239" r="10" fill="#38bdf8" fill-opacity="0.85" />
+    <line x1="230" y1="239" x2="340" y2="239" stroke="#93c5fd" stroke-width="8" stroke-linecap="round" stroke-opacity="0.7" />
+    <!-- Diff Code Lines -->
+    <line x1="190" y1="300" x2="400" y2="300" stroke="#bae6fd" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <line x1="190" y1="350" x2="360" y2="350" stroke="#bae6fd" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <!-- Red Deletion -->
+    <rect x="180" y="390" width="280" height="40" rx="10" fill="#ef4444" fill-opacity="0.75" />
+    <line x1="200" y1="410" x2="380" y2="410" stroke="#fecaca" stroke-width="14" stroke-linecap="round" />
+    <!-- Normal -->
+    <line x1="190" y1="470" x2="340" y2="470" stroke="#bae6fd" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <!-- Green Addition -->
+    <rect x="180" y="510" width="280" height="40" rx="10" fill="#22c55e" fill-opacity="0.75" />
+    <line x1="200" y1="530" x2="410" y2="530" stroke="#bbf7d0" stroke-width="14" stroke-linecap="round" />
+    <!-- Normal Lines -->
+    <line x1="190" y1="590" x2="380" y2="590" stroke="#bae6fd" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <line x1="190" y1="640" x2="320" y2="640" stroke="#bae6fd" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <line x1="190" y1="690" x2="400" y2="690" stroke="#bae6fd" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <line x1="190" y1="740" x2="350" y2="740" stroke="#bae6fd" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+  </g>
+
+  <!-- Right Comparison Pane (Purple) -->
+  <g id="rightPane">
+    <rect x="544" y="200" width="320" height="624" rx="48" fill="url(#rightGrad)" stroke="#c084fc" stroke-width="6" stroke-opacity="0.8" />
+    <!-- Header -->
+    <circle cx="582" cy="239" r="10" fill="#c084fc" fill-opacity="0.85" />
+    <line x1="614" y1="239" x2="724" y2="239" stroke="#ddd6fe" stroke-width="8" stroke-linecap="round" stroke-opacity="0.7" />
+    <!-- Diff Code Lines -->
+    <line x1="574" y1="300" x2="784" y2="300" stroke="#ddd6fe" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <line x1="574" y1="350" x2="744" y2="350" stroke="#ddd6fe" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <!-- Green Addition -->
+    <rect x="564" y="390" width="280" height="40" rx="10" fill="#22c55e" fill-opacity="0.75" />
+    <line x1="584" y1="410" x2="794" y2="410" stroke="#bbf7d0" stroke-width="14" stroke-linecap="round" />
+    <!-- Normal -->
+    <line x1="574" y1="470" x2="724" y2="470" stroke="#ddd6fe" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <!-- Cyan Modified -->
+    <rect x="564" y="510" width="280" height="40" rx="10" fill="#0ea5e9" fill-opacity="0.75" />
+    <line x1="584" y1="530" x2="774" y2="530" stroke="#bae6fd" stroke-width="14" stroke-linecap="round" />
+    <!-- Normal Lines -->
+    <line x1="574" y1="590" x2="764" y2="590" stroke="#ddd6fe" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <line x1="574" y1="640" x2="704" y2="640" stroke="#ddd6fe" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <line x1="574" y1="690" x2="784" y2="690" stroke="#ddd6fe" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+    <line x1="574" y1="740" x2="734" y2="740" stroke="#ddd6fe" stroke-width="16" stroke-linecap="round" stroke-opacity="0.8" />
+  </g>
+
+  <!-- Central Sync and Diff Glowing Badge -->
+  <g id="centerBadge" filter="url(#badgeShadow)">
+    <circle cx="512" cy="512" r="130" fill="url(#badgeGrad)" stroke="#ffffff" stroke-width="6" stroke-opacity="0.9" />
+    <!-- Top Arrow (Right) -->
+    <line x1="447" y1="477" x2="552" y2="477" stroke="#ffffff" stroke-width="22" stroke-linecap="round" />
+    <polygon points="542,445 587,477 542,509" fill="#ffffff" />
+    <!-- Bottom Arrow (Left) -->
+    <line x1="472" y1="547" x2="577" y2="547" stroke="#ffffff" stroke-width="22" stroke-linecap="round" />
+    <polygon points="482,515 437,547 482,579" fill="#ffffff" />
+  </g>
+</svg>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+  IgnorableNamespaces="uap uap10 rescap desktop4 desktop5">
+
+  <Identity
+    Name="DiffAndCompareTool.ContextMenu"
+    Publisher="CN=DiffAndCompareTool"
+    Version="1.0.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>diff_and_compare_tool Context Menu</DisplayName>
+    <PublisherDisplayName>DiffAndCompareTool</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="App" Executable="dist\diff_and_compare\diff_and_compare.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="diff_and_compare_tool"
+        Description="Next-Gen Multi-Format Diff &amp; Merge Studio"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+
+      <Extensions>
+        <!-- Windows 11 Top-Level Context Menu Integration via IExplorerCommand -->
+        <desktop4:Extension Category="windows.fileExplorerContextMenu">
+          <desktop4:FileExplorerContextMenu>
+            <desktop5:ItemType Type="*">
+              <desktop5:Verb Id="CompareWithDiffAndCompareTool" Clsid="d7053a55-6905-4a29-a8a0-f535636d9370" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type="Directory">
+              <desktop5:Verb Id="CompareFolderWithDiffAndCompareTool" Clsid="d7053a55-6905-4a29-a8a0-f535636d9371" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenu>
+        </desktop4:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

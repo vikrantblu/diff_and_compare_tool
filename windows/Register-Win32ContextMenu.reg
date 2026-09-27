@@ -1,0 +1,61 @@
+Windows Registry Editor Version 5.00
+
+; ========================================================
+; diff_and_compare_tool - Windows Explorer HKCU Shell Integration
+;
+; Note: Uses %LOCALAPPDATA%\Programs\diff_and_compare_tool path.
+; To dynamically register from source for any local repository path, run:
+;   python app/main.py --install-shell
+; ========================================================
+
+; 1. All Files (*)
+[HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareToolCompare]
+@="Compare with diff_and_compare_tool"
+"Icon"="\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\assets\\app_icon.ico\""
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareToolCompare\command]
+@="\"\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\diff_and_compare.exe\" --compare \"%1\"\""
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareToolSelectLeft]
+@="diff_and_compare_tool: Select Left"
+"Icon"="\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\assets\\app_icon.ico\""
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareToolSelectLeft\command]
+@="\"\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\diff_and_compare.exe\" --select-left \"%1\"\""
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareToolSelectRight]
+@="diff_and_compare_tool: Select Right"
+"Icon"="\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\assets\\app_icon.ico\""
+
+[HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareToolSelectRight\command]
+@="\"\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\diff_and_compare.exe\" --select-right \"%1\"\""
+
+; 2. Directories
+[HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareToolCompare]
+@="Compare with diff_and_compare_tool"
+"Icon"="\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\assets\\app_icon.ico\""
+
+[HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareToolCompare\command]
+@="\"\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\diff_and_compare.exe\" --compare \"%1\"\""
+
+[HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareToolSelectLeft]
+@="diff_and_compare_tool: Select Left"
+"Icon"="\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\assets\\app_icon.ico\""
+
+[HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareToolSelectLeft\command]
+@="\"\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\diff_and_compare.exe\" --select-left \"%1\"\""
+
+[HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareToolSelectRight]
+@="diff_and_compare_tool: Select Right"
+"Icon"="\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\assets\\app_icon.ico\""
+
+[HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareToolSelectRight\command]
+@="\"\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\diff_and_compare.exe\" --select-right \"%1\"\""
+
+; 3. Directory Background
+[HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\DiffAndCompareToolCompare]
+@="Compare with diff_and_compare_tool"
+"Icon"="\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\assets\\app_icon.ico\""
+
+[HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\DiffAndCompareToolCompare\command]
+@="\"\"%LOCALAPPDATA%\\Programs\\diff_and_compare_tool\\diff_and_compare.exe\" --compare \"%V\"\""

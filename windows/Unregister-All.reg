@@ -1,0 +1,38 @@
+Windows Registry Editor Version 5.00
+
+; ========================================================
+; diff_and_compare_tool - Windows Registry Removal
+; Removes Context Menu, App Paths, and Uninstall entries.
+; ========================================================
+
+; 1. Context Menu Entries
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareToolCompare]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareToolSelectLeft]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareToolSelectRight]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareCompare]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareSelectLeft]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\DiffAndCompareSelectRight]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\BeyondCompareCompare]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\BeyondCompareSelectLeft]
+[-HKEY_CURRENT_USER\Software\Classes\*\shell\BeyondCompareSelectRight]
+
+[-HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareToolCompare]
+[-HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareToolSelectLeft]
+[-HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareToolSelectRight]
+[-HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareCompare]
+[-HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareSelectLeft]
+[-HKEY_CURRENT_USER\Software\Classes\Directory\shell\DiffAndCompareSelectRight]
+[-HKEY_CURRENT_USER\Software\Classes\Directory\shell\BeyondCompareCompare]
+[-HKEY_CURRENT_USER\Software\Classes\Directory\shell\BeyondCompareSelectLeft]
+[-HKEY_CURRENT_USER\Software\Classes\Directory\shell\BeyondCompareSelectRight]
+
+[-HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\DiffAndCompareToolCompare]
+[-HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\DiffAndCompareCompare]
+[-HKEY_CURRENT_USER\Software\Classes\Directory\Background\shell\BeyondCompareCompare]
+
+; 2. App Paths Entries
+[-HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\App Paths\diff_and_compare.exe]
+[-HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\App Paths\diff_and_compare_tool.exe]
+
+; 3. Installed Apps Uninstall Entry
+[-HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\diff_and_compare_tool]
