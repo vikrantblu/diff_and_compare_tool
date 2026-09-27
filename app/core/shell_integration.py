@@ -16,8 +16,17 @@ import os
 import sys
 import json
 import time
-import winreg
-import ctypes
+
+try:
+    import winreg
+except ImportError:
+    winreg = None
+
+try:
+    import ctypes
+except ImportError:
+    ctypes = None
+
 from typing import Optional, Tuple
 
 

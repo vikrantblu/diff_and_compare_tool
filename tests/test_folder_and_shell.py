@@ -109,11 +109,13 @@ class TestFolderAndShell(unittest.TestCase):
         clear_state()
         self.assertIsNone(get_left_path())
 
+    @unittest.skipUnless(sys.platform == "win32", "Windows registry tests require Windows OS")
     def test_shell_context_menu_installed(self):
         ok, msg = install_context_menu()
         self.assertTrue(ok)
         self.assertTrue(is_context_menu_installed())
 
+    @unittest.skipUnless(sys.platform == "win32", "Windows registry tests require Windows OS")
     def test_reg_file_generation(self):
         from app.core.shell_integration import generate_reg_content, export_reg_file
         content = generate_reg_content(target_exe=sys.executable)
@@ -128,6 +130,7 @@ class TestFolderAndShell(unittest.TestCase):
             self.assertTrue(ok)
             self.assertTrue(os.path.isfile(reg_path))
 
+    @unittest.skipUnless(sys.platform == "win32", "Windows registry tests require Windows OS")
     def test_app_paths_and_uninstall_registration(self):
         from app.core.shell_integration import (
             install_app_paths, uninstall_app_paths,
