@@ -49,6 +49,10 @@ Thank you for your interest in contributing to **diff_and_compare_tool**!
 Have a question, feedback, or feature idea?
 Head over to [GitHub Discussions](https://github.com/vikrantblu/diff_and_compare_tool/discussions) to ask questions, propose ideas, or connect with the maintainers without needing to open an issue.
 
+## Sponsorship & Supporting the Project
+
+If you find this project valuable and would like to support ongoing development, maintenance, and Windows certificate signing, please consider sponsoring via [GitHub Sponsors](https://github.com/sponsors/vikrantblu).
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the project's [MIT License](LICENSE).

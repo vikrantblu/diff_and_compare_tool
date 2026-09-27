@@ -8,6 +8,7 @@ A high-performance, cross-platform file comparison, 3-way merge, and multi-forma
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-vikrantblu%2Fdiff__and__compare__tool-blue?logo=github)](https://github.com/vikrantblu/diff_and_compare_tool)
 [![Discussions](https://img.shields.io/badge/Discussions-Join%20Chat-teal?logo=github)](https://github.com/vikrantblu/diff_and_compare_tool/discussions)
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/vikrantblu)
 
 ---
 
@@ -198,4 +199,30 @@ python build.py --target-arch arm64
 - **[Functionality & User Guide](docs/FUNCTIONALITY_GUIDE.md)**: Exhaustive manual detailing all features, workflows, and keyboard shortcuts.
 - **[System Architecture & Design Specification](docs/ARCHITECTURE_AND_DESIGN.md)**: Deep technical architecture, algorithms (Tree-sitter AST, Myers, DMP, Moved Blocks, Keyed Grid, MMF, VFS, Secret Scrubber), and Windows 11 shell integration.
 - **[Windows 11 Context Menu Setup](windows/Register-Windows11ContextMenu.ps1)**: MSIX Sparse package integration for top-level Windows 11 context menu.
+
+---
+
+## 💖 Support & Sponsoring
+
+**diff_and_compare_tool** is a free, open-source project created and maintained for developers, engineers, and power users.
+
+If this tool saves you time, streamlines your merge conflicts, or enhances your workflow, please consider sponsoring its development:
+
+<p align="center">
+  <a href="https://github.com/sponsors/vikrantblu">
+    <img src="https://img.shields.io/badge/Sponsor_on_GitHub-vikrantblu-ea4aaa?style=for-the-badge&logo=github-sponsors" alt="Sponsor on GitHub" />
+  </a>
+</p>
+
+### Where your sponsorship goes:
+- 🚀 **New Studio Engines**: Developing further specialized format comparisons (e.g. 3D meshes, audio waveform, geospatial GIS diffing).
+- 🔏 **Windows Code Signing Certificate**: Eliminating Windows SmartScreen warnings on installer executables.
+- ⚡ **Continuous Maintenance & Performance**: Keeping AST grammars, PySide6, and BLAKE3 acceleration up to date.
+- 🌐 **Documentation & CI/CD Pipelines**: Automated multi-architecture release packaging (x64 and ARM64).
+
+Even if you cannot sponsor financially, you can support the project by:
+- ⭐ **Starring the repository** on GitHub.
+- 📢 Sharing it with colleagues and developer communities.
+- 💬 Joining [GitHub Discussions](https://github.com/vikrantblu/diff_and_compare_tool/discussions) and submitting feedback or pull requests!
+
 
