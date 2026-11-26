@@ -199,7 +199,7 @@ Write-InstallerLog "Registering in Windows Installed Apps..." "Cyan"
 $unSubKey = "Software\Microsoft\Windows\CurrentVersion\Uninstall\diff_and_compare_tool"
 $uk = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($unSubKey)
 $uk.SetValue("DisplayName", "diff_and_compare_tool")
-$uk.SetValue("DisplayVersion", "1.0.0")
+$uk.SetValue("DisplayVersion", "1.1.0")
 $uk.SetValue("Publisher", "diff_and_compare_tool")
 $uk.SetValue("DisplayIcon", "$targetExe,0")
 $uk.SetValue("InstallLocation", $InstallDir)

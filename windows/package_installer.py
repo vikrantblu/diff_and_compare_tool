@@ -2,7 +2,7 @@
 Package Installer & Distribution Generator for diff_and_compare_tool
 Creates:
 1. dist/diff_and_compare_installer/ (Ready-to-deploy folder with 1-click Install.cmd & scripts)
-2. dist/diff_and_compare_tool-v1.0.0-windows-x64.zip (Distribution archive for end users)
+2. dist/diff_and_compare_tool-v1.1.0-windows-x64.zip (Distribution archive for end users)
 3. Compiles Inno Setup .exe if ISCC compiler is installed on host.
 """
 
@@ -19,7 +19,7 @@ APP_DIST_DIR = DIST_DIR / "diff_and_compare"
 PACKAGE_DIR = DIST_DIR / "diff_and_compare_installer"
 WINDOWS_DIR = REPO_ROOT / "windows"
 ASSETS_DIR = REPO_ROOT / "assets"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 ZIP_NAME = f"diff_and_compare_tool-v{VERSION}-windows-x64.zip"
 
 

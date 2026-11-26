@@ -3,7 +3,7 @@
 ; Installs per-user (no admin rights required) or system-wide.
 
 #define MyAppName "Diff & Compare Pro"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Diff & Compare Pro"
 #define MyAppURL "https://github.com/vikrantblu/diff_and_compare_tool"
 #define MyAppExeName "diff_and_compare.exe"
