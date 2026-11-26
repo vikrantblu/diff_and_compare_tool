@@ -478,7 +478,7 @@ class HeadlessReporter:
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Side-by-Side Diff Report — diff_and_compare_tool</title>
+<title>Side-by-Side Diff Report — Diff & Compare Pro</title>
 <style>
     body {{ font-family: "Segoe UI", -apple-system, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 20px; }}
     .wrap {{ max-width: 1440px; margin: 0 auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(15,23,42,0.06); }}

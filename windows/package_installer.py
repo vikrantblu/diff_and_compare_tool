@@ -74,7 +74,7 @@ def assemble_package():
 
     # 4. Generate README_INSTALL.txt
     readme_text = f"""========================================================================
-diff_and_compare_tool v{VERSION} - Windows Installation Package
+Diff & Compare Pro v{VERSION} - Windows Installation Package
 ========================================================================
 
 HOW TO INSTALL:
@@ -83,9 +83,9 @@ Method 1 (Recommended - 1-Click):
   Double-click "Install.cmd"
   - Installs to %LOCALAPPDATA%\\Programs\\diff_and_compare_tool (no Admin rights required).
   - Registers Windows Explorer right-click context menu:
-      "Compare with diff_and_compare_tool"
-      "diff_and_compare_tool: Select Left"
-      "diff_and_compare_tool: Select Right"
+      "Compare with Diff & Compare Pro"
+      "Diff & Compare Pro: Select Left"
+      "Diff & Compare Pro: Select Right"
   - Registers Windows App Paths (launch via Win+R or Command Prompt: 'diff_and_compare').
   - Adds to User PATH.
   - Registers in Windows Settings "Installed Apps" / "Add or Remove Programs".
@@ -102,7 +102,7 @@ Method 3 (Portable / Manual Registry):
 HOW TO UNINSTALL:
 -----------------
 - Double-click "Uninstall.cmd" or run "uninstall.cmd" in the installed folder.
-- Or use Windows Settings -> Installed Apps -> diff_and_compare_tool -> Uninstall.
+- Or use Windows Settings -> Installed Apps -> Diff & Compare Pro -> Uninstall.
 - Or double-click "Unregister-All.reg".
 ========================================================================
 """
@@ -152,7 +152,7 @@ def try_compile_inno():
 
 def main():
     print("==========================================================")
-    print("  Building diff_and_compare_tool Installable Distribution")
+    print("  Building Diff & Compare Pro Installable Distribution")
     print("==========================================================")
     ensure_build()
     assemble_package()

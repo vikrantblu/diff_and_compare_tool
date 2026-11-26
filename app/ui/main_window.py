@@ -38,6 +38,7 @@ from app.ui.dialogs.remote_profile_dialog import RemoteProfileDialog
 from app.ui.styles.theme import MODERN_LIGHT_QSS
 from app.ui.styles.icons import get_line_icon, get_app_icon, get_studio_badge_icon
 from app.ui.styles.windows_effects import apply_windows_material, BACKDROP_MICA_ALT
+from app.core.branding import APP_NAME, APP_TAGLINE
 from app.core.session_manager import SessionManager
 from app.core.archive_vfs import ArchiveVFS
 from app.core.remote_vfs import RemoteVFS
@@ -83,7 +84,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("diff_and_compare_tool — Next-Gen Diff & Merge Studio")
+        self.setWindowTitle(f"{APP_NAME} — {APP_TAGLINE}")
         self.setWindowIcon(get_app_icon())
         self.resize(1380, 880)
 
@@ -117,7 +118,7 @@ class MainWindow(QMainWindow):
 
         self.home_tab = HomeView()
         self.tabs.addTab(self.home_tab, get_app_icon(), " Home")
-        self.tabs.setTabToolTip(0, "diff_and_compare Home / Welcome Screen & Session Launcher")
+        self.tabs.setTabToolTip(0, f"{APP_NAME} — Home & Session Launcher")
         self.home_tab.sessionSelected.connect(self._on_home_session_selected)
         self.home_tab.compareFilesRequested.connect(self.smart_open_comparison)
         self.home_tab.clipboardCompareRequested.connect(self._compare_clipboard)
@@ -203,7 +204,7 @@ class MainWindow(QMainWindow):
         idx = self.tabs.indexOf(self.home_tab)
         if idx == -1:
             self.tabs.insertTab(0, self.home_tab, get_app_icon(), " Home")
-            self.tabs.setTabToolTip(0, "diff_and_compare Home / Welcome Screen & Session Launcher")
+            self.tabs.setTabToolTip(0, f"{APP_NAME} — Home & Session Launcher")
             self._update_tab_close_buttons()
             self.tabs.setCurrentIndex(0)
         else:
@@ -786,7 +787,7 @@ class MainWindow(QMainWindow):
             self,
             "Configure Git Difftool & Mergetool",
             f"Current global git diff.tool = {cur_diff}\nCurrent global git merge.tool = {cur_merge}\n\n"
-            f"Set diff_and_compare_tool as your global Git difftool and 3-way mergetool?",
+            f"Set {APP_NAME} as your global Git difftool and 3-way mergetool?",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.Yes
         )
@@ -914,7 +915,7 @@ class MainWindow(QMainWindow):
             target = fix_path(args.select_left)
             set_left_path(target)
             show_native_notification(
-                "diff_and_compare_tool",
+                APP_NAME,
                 f"✓ Selected as Left:\n{target}\n\nNow right-click on the second file/folder and choose 'Select Right'."
             )
             return

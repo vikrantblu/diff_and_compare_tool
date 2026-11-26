@@ -220,8 +220,13 @@ class TestFolderMergeAndRemote(unittest.TestCase):
 
     def test_brand_assets_studio_badges_and_home_remote_signal(self):
         from PIL import Image
+        from app.core.branding import APP_NAME
+        from app.core.shell_integration import APP_DISPLAY_NAME
         from app.ui.styles.icons import STUDIO_BADGE_THEMES, get_studio_badge_pixmap, get_studio_badge_icon
         from app.ui.home_view import HomeView
+
+        self.assertEqual(APP_NAME, "Diff & Compare Pro")
+        self.assertEqual(APP_DISPLAY_NAME, "Diff & Compare Pro")
 
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         expected_assets = [
@@ -244,6 +249,11 @@ class TestFolderMergeAndRemote(unittest.TestCase):
             ic = get_studio_badge_icon(mode_id, size=20)
             self.assertFalse(pm.isNull(), f"Null badge pixmap for {mode_id}")
             self.assertFalse(ic.isNull(), f"Null badge icon for {mode_id}")
+
+        win = MainWindow()
+        self.assertIn("Diff & Compare Pro", win.windowTitle())
+        win.close()
+        win.deleteLater()
 
         hv = HomeView()
         try:

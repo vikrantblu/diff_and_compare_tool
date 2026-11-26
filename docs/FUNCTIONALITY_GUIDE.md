@@ -1,6 +1,6 @@
-# diff_and_compare_tool — Complete Functionality & User Guide
+# Diff & Compare Pro — Complete Functionality & User Guide
 
-**diff_and_compare_tool** is a modern, high-performance, cross-platform file comparison, 3-way merge, and multi-format data synchronization desktop suite built with Python (PySide6) and optimized for Windows 11 standalone operation.
+**Diff & Compare Pro** (`diff_and_compare_tool`) is a modern, high-performance, cross-platform file comparison, 3-way merge, and multi-format data synchronization desktop suite built with Python (PySide6) and optimized for Windows 11 standalone operation.
 
 ---
 

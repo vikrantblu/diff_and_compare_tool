@@ -21,6 +21,7 @@ from PySide6.QtGui import QFont
 
 from app.ui.main_window import MainWindow
 from app.ui.styles.theme import MODERN_LIGHT_QSS
+from app.core.branding import APP_NAME, APP_TAGLINE, APP_VERSION
 from app.core.shell_integration import (
     get_left_path, set_left_path, show_native_notification,
     install_context_menu, uninstall_context_menu,
@@ -30,7 +31,7 @@ from app.core.shell_integration import (
 
 def parse_arguments(args_list=None):
     parser = argparse.ArgumentParser(
-        description="diff_and_compare_tool — Next-Gen Multi-Format Diff & 3-Way Merge Studio"
+        description=f"{APP_NAME} — {APP_TAGLINE}"
     )
     parser.add_argument("files", nargs="*", help="Files or folders to compare or merge")
     parser.add_argument("--diff", "-d", nargs=2, metavar=("FILE1", "FILE2"), help="Perform 2-way file diff")
@@ -173,8 +174,10 @@ def main():
             pass
 
     app = QApplication(sys.argv)
-    app.setApplicationName("diff_and_compare_tool")
-    app.setOrganizationName("diff_and_compare_tool")
+    app.setApplicationName(APP_NAME)
+    app.setApplicationDisplayName(APP_NAME)
+    app.setApplicationVersion(APP_VERSION)
+    app.setOrganizationName(APP_NAME)
     app.setStyleSheet(MODERN_LIGHT_QSS)
 
     # Native Windows modern font stack
@@ -215,7 +218,7 @@ def main():
         else:
             set_left_path(right_target)
             show_native_notification(
-                "diff_and_compare_tool",
+                APP_NAME,
                 f"Left side was not set yet.\n\nSaved '{os.path.basename(right_target)}' as Left.\nPlease right-click the second item and choose 'Select Right'."
             )
             return
@@ -232,7 +235,7 @@ def main():
             else:
                 set_left_path(item)
                 show_native_notification(
-                    "diff_and_compare_tool",
+                    APP_NAME,
                     f"Selected as Left:\n{item}\n\nSelect a second file/folder and click 'Select Right' or 'Select files to compare'."
                 )
                 return

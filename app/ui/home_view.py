@@ -22,6 +22,7 @@ from app.ui.styles.icons import (
     get_app_icon_pixmap,
     get_studio_badge_pixmap,
 )
+from app.core.branding import APP_NAME
 from app.core.shell_integration import get_left_path, set_left_path, clear_state
 from app.core.session_manager import SessionManager
 
@@ -152,7 +153,7 @@ class HomeView(QWidget):
         title_col.setContentsMargins(0, 0, 0, 0)
         title_col.setSpacing(3)
 
-        lbl_brand = QLabel("Diff & Compare Studio")
+        lbl_brand = QLabel(APP_NAME)
         lbl_brand.setStyleSheet(
             "font-size: 19px; font-weight: 800; color: #0f172a; background: transparent; border: none;"
         )

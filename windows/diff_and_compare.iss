@@ -2,9 +2,9 @@
 ; Builds standalone setup executable: Setup_diff_and_compare_tool.exe
 ; Installs per-user (no admin rights required) or system-wide.
 
-#define MyAppName "diff_and_compare_tool"
+#define MyAppName "Diff & Compare Pro"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "diff_and_compare_tool"
+#define MyAppPublisher "Diff & Compare Pro"
 #define MyAppURL "https://github.com/vikrantblu/diff_and_compare_tool"
 #define MyAppExeName "diff_and_compare.exe"
 
@@ -16,7 +16,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={localappdata}\Programs\{#MyAppName}
+DefaultDirName={localappdata}\Programs\diff_and_compare_tool
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -54,33 +54,33 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 
 [Registry]
 ; 1. Explorer Context Menu: All Files
-Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolCompare"; ValueType: string; ValueData: "Compare with diff_and_compare_tool"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolCompare"; ValueType: string; ValueData: "Compare with Diff & Compare Pro"; Tasks: contextmenu; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolCompare"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\assets\app_icon.ico"""; Tasks: contextmenu
 Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolCompare\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" --compare ""%1"""; Tasks: contextmenu
 
-Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolSelectLeft"; ValueType: string; ValueData: "diff_and_compare_tool: Select Left"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolSelectLeft"; ValueType: string; ValueData: "Diff & Compare Pro: Select Left"; Tasks: contextmenu; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolSelectLeft"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\assets\app_icon.ico"""; Tasks: contextmenu
 Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolSelectLeft\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" --select-left ""%1"""; Tasks: contextmenu
 
-Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolSelectRight"; ValueType: string; ValueData: "diff_and_compare_tool: Select Right"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolSelectRight"; ValueType: string; ValueData: "Diff & Compare Pro: Select Right"; Tasks: contextmenu; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolSelectRight"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\assets\app_icon.ico"""; Tasks: contextmenu
 Root: HKCU; Subkey: "Software\Classes\*\shell\DiffAndCompareToolSelectRight\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" --select-right ""%1"""; Tasks: contextmenu
 
 ; 2. Explorer Context Menu: Directories
-Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolCompare"; ValueType: string; ValueData: "Compare with diff_and_compare_tool"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolCompare"; ValueType: string; ValueData: "Compare with Diff & Compare Pro"; Tasks: contextmenu; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolCompare"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\assets\app_icon.ico"""; Tasks: contextmenu
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolCompare\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" --compare ""%1"""; Tasks: contextmenu
 
-Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolSelectLeft"; ValueType: string; ValueData: "diff_and_compare_tool: Select Left"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolSelectLeft"; ValueType: string; ValueData: "Diff & Compare Pro: Select Left"; Tasks: contextmenu; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolSelectLeft"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\assets\app_icon.ico"""; Tasks: contextmenu
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolSelectLeft\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" --select-left ""%1"""; Tasks: contextmenu
 
-Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolSelectRight"; ValueType: string; ValueData: "diff_and_compare_tool: Select Right"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolSelectRight"; ValueType: string; ValueData: "Diff & Compare Pro: Select Right"; Tasks: contextmenu; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolSelectRight"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\assets\app_icon.ico"""; Tasks: contextmenu
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\DiffAndCompareToolSelectRight\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" --select-right ""%1"""; Tasks: contextmenu
 
 ; 3. Explorer Context Menu: Directory Background
-Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\DiffAndCompareToolCompare"; ValueType: string; ValueData: "Compare with diff_and_compare_tool"; Tasks: contextmenu; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\DiffAndCompareToolCompare"; ValueType: string; ValueData: "Compare with Diff & Compare Pro"; Tasks: contextmenu; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\DiffAndCompareToolCompare"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\assets\app_icon.ico"""; Tasks: contextmenu
 Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\DiffAndCompareToolCompare\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" --compare ""%V"""; Tasks: contextmenu
 

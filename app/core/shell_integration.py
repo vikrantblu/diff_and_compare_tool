@@ -29,11 +29,17 @@ except ImportError:
 
 from typing import Optional, Tuple
 
+from app.core.branding import (
+    APP_NAME as BRAND_APP_NAME,
+    APP_PUBLISHER as BRAND_APP_PUBLISHER,
+    APP_VERSION as BRAND_APP_VERSION,
+)
+
 
 APP_NAME = "diff_and_compare"
-APP_DISPLAY_NAME = "diff_and_compare_tool"
-APP_VERSION = "1.0.0"
-APP_PUBLISHER = "diff_and_compare_tool"
+APP_DISPLAY_NAME = BRAND_APP_NAME
+APP_VERSION = BRAND_APP_VERSION
+APP_PUBLISHER = BRAND_APP_PUBLISHER
 STATE_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "diff_and_compare")
 STATE_FILE = os.path.join(STATE_DIR, "shell_state.json")
 
@@ -151,17 +157,17 @@ REG_TARGETS = [
 MENU_ITEMS = [
     {
         "key_name": "DiffAndCompareToolCompare",
-        "title": "Compare with diff_and_compare_tool",
+        "title": f"Compare with {BRAND_APP_NAME}",
         "flag": "--compare"
     },
     {
         "key_name": "DiffAndCompareToolSelectLeft",
-        "title": "diff_and_compare_tool: Select Left",
+        "title": f"{BRAND_APP_NAME}: Select Left",
         "flag": "--select-left"
     },
     {
         "key_name": "DiffAndCompareToolSelectRight",
-        "title": "diff_and_compare_tool: Select Right",
+        "title": f"{BRAND_APP_NAME}: Select Right",
         "flag": "--select-right"
     }
 ]
@@ -423,7 +429,7 @@ def generate_reg_content(target_exe: Optional[str] = None, icon_path: Optional[s
     content = f"""Windows Registry Editor Version 5.00
 
 ; ========================================================
-; diff_and_compare_tool - Complete Windows Registry Configuration
+; {BRAND_APP_NAME} - Complete Windows Registry Configuration
 ; Generated automatically for: {resolved_exe}
 ; ========================================================
 
@@ -431,21 +437,21 @@ def generate_reg_content(target_exe: Optional[str] = None, icon_path: Optional[s
 ; 1. Explorer Context Menu: All Files (*)
 ; ---------------------------------------------
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolCompare]
-@="Compare with diff_and_compare_tool"
+@="Compare with {BRAND_APP_NAME}"
 "Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolCompare\\command]
 @="\\"{reg_exe}\\" --compare \\"%1\\""
 
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolSelectLeft]
-@="diff_and_compare_tool: Select Left"
+@="{BRAND_APP_NAME}: Select Left"
 "Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolSelectLeft\\command]
 @="\\"{reg_exe}\\" --select-left \\"%1\\""
 
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolSelectRight]
-@="diff_and_compare_tool: Select Right"
+@="{BRAND_APP_NAME}: Select Right"
 "Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolSelectRight\\command]
@@ -455,21 +461,21 @@ def generate_reg_content(target_exe: Optional[str] = None, icon_path: Optional[s
 ; 2. Explorer Context Menu: Directories / Folders
 ; ---------------------------------------------
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolCompare]
-@="Compare with diff_and_compare_tool"
+@="Compare with {BRAND_APP_NAME}"
 "Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolCompare\\command]
 @="\\"{reg_exe}\\" --compare \\"%1\\""
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolSelectLeft]
-@="diff_and_compare_tool: Select Left"
+@="{BRAND_APP_NAME}: Select Left"
 "Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolSelectLeft\\command]
 @="\\"{reg_exe}\\" --select-left \\"%1\\""
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolSelectRight]
-@="diff_and_compare_tool: Select Right"
+@="{BRAND_APP_NAME}: Select Right"
 "Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolSelectRight\\command]
@@ -479,7 +485,7 @@ def generate_reg_content(target_exe: Optional[str] = None, icon_path: Optional[s
 ; 3. Explorer Context Menu: Directory Background (Empty Space)
 ; ---------------------------------------------
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\Background\\shell\\DiffAndCompareToolCompare]
-@="Compare with diff_and_compare_tool"
+@="Compare with {BRAND_APP_NAME}"
 "Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\Background\\shell\\DiffAndCompareToolCompare\\command]

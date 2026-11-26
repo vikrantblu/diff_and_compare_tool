@@ -1,8 +1,8 @@
-# diff_and_compare_tool — System Architecture & Design Specification
+# Diff & Compare Pro — System Architecture & Design Specification
 
 ## 1. System Overview & Architectural Principles
 
-**diff_and_compare_tool** bridges traditional line-by-line diff utilities and modern developer/data workflows. It features a decoupled, reactive architecture where domain-specific comparator engines operate beneath a modern Windows 11 Fluent presentation layer.
+**Diff & Compare Pro** (`diff_and_compare_tool`) bridges traditional line-by-line diff utilities and modern developer/data workflows. It features a decoupled, reactive architecture where domain-specific comparator engines operate beneath a modern Windows 11 Fluent presentation layer.
 
 ```mermaid
 graph TD

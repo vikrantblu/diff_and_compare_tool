@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="docs/assets/app_icon.png" alt="diff_and_compare_tool Logo" width="84" height="84" />
-  <h1>diff_and_compare_tool — Next-Gen Diff &amp; Merge Studio</h1>
+  <img src="docs/assets/app_icon.png" alt="Diff & Compare Pro Logo" width="84" height="84" />
+  <h1>Diff &amp; Compare Pro — Next-Gen Diff &amp; Merge Studio</h1>
   <p>A high-performance, cross-platform file comparison, 3-way merge, and multi-format data synchronization desktop suite built with Python (PySide6) and modern Windows 11 Fluent Light design principles.</p>
   <p>
-    <img src="docs/assets/hero_banner.png" alt="diff_and_compare_tool Fluent Light Hero Artwork" width="760" />
+    <img src="docs/assets/hero_banner.png" alt="Diff & Compare Pro Fluent Light Hero Artwork" width="760" />
   </p>
 </div>
 
