@@ -86,6 +86,7 @@ class SingleInstanceManager(QObject):
                 except Exception:
                     pass
             socket.disconnectFromServer()
+            socket.deleteLater()
 
         socket.readyRead.connect(handle_read)
 

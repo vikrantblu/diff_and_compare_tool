@@ -390,7 +390,7 @@ BACKDROP_MICA_ALT = 4       # Tabbed Mica Backdrop
 ```
 
 - **Mica Alt Material**: Applies `BACKDROP_MICA_ALT` (Type 4) to the root window handle (`HWND`), rendering a tinted translucent backdrop that harmonizes with Windows 11 desktop themes and tabbed interfaces.
-- **Immersive Dark Mode**: Toggles `DWMWA_USE_IMMERSIVE_DARK_MODE` synchronously with application theme changes, rendering native dark-themed titlebars and caption buttons.
+- **Fluent Light Mode**: Sets `DWMWA_USE_IMMERSIVE_DARK_MODE = 0` so the native titlebar and caption buttons harmonize cleanly with the application's crisp White / Light Fluent palette.
 - **Rounded Window Corners**: Enforces Windows 11 standard rounded corner preferences (`CORNER_ROUND`).
 - **Safe Graceful Degradation**: On Windows 10 (Build $<22000$) or non-Windows platforms, DWM calls fail safely with zero exceptions, falling back to standard Fluent QSS styling.
 

@@ -4,7 +4,7 @@
 a = Analysis(
     ['app\\main.py'],
     pathex=[],
-    datas=[('assets', 'assets')],
+    datas=[('assets', 'assets'), ('app\\ui\\styles\\assets', 'app\\ui\\styles\\assets')],
     hiddenimports=[
         'tree_sitter',
         'tree_sitter_python',
@@ -15,7 +15,8 @@ a = Analysis(
         'fitz',
         'jsonpath_ng',
         'openpyxl',
-        'yaml'
+        'yaml',
+        'defusedxml'
     ],
     hookspath=[],
     hooksconfig={},

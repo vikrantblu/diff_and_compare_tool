@@ -85,14 +85,25 @@ class StructuredDiffEngine:
         """Performs hierarchical tree diffing across Left and Right structured documents with optional query filtering and unordered array matching."""
         try:
             left_obj, detected_fmt = cls.parse_content(left_text, format_type)
-            right_obj, _ = cls.parse_content(right_text, detected_fmt)
         except Exception as e:
-            # Fallback for parse errors
             root = StructuredNode(
-                name="Parse Error",
+                name="Left Parse Error",
                 path="root",
                 node_type="error",
                 left_val=str(e),
+                right_val="",
+                status="modified"
+            )
+            return StructuredDiffResult(root, 1, 0, 0, 1, 0, "error")
+
+        try:
+            right_obj, _ = cls.parse_content(right_text, detected_fmt)
+        except Exception as e:
+            root = StructuredNode(
+                name="Right Parse Error",
+                path="root",
+                node_type="error",
+                left_val="",
                 right_val=str(e),
                 status="modified"
             )
@@ -180,13 +191,13 @@ class StructuredDiffEngine:
         matched_r_indices = set()
         unmatched_l = []
 
-        # Pass 1: Exact matches
+        # Pass 1: Strict type-aware exact matches (prevents True == 1 / False == 0 false matches)
         for l_idx, l_item in enumerate(l_list):
             found_match = False
             for r_idx, r_item in enumerate(r_list):
                 if r_idx in matched_r_indices:
                     continue
-                if l_item == r_item:
+                if cls._strict_equals(l_item, r_item):
                     child = cls._compare_json_nodes(
                         l_item, r_item, f"{path}[{l_idx}]", f"[~{l_idx}]",
                         ignore_key_order=ignore_key_order,
@@ -270,8 +281,10 @@ class StructuredDiffEngine:
             l_dict = l_val if isinstance(l_val, dict) else {}
             r_dict = r_val if isinstance(r_val, dict) else {}
 
-            all_keys = set(l_dict.keys()) | set(r_dict.keys())
-            sorted_keys = sorted(all_keys) if ignore_key_order else list(all_keys)
+            if ignore_key_order:
+                sorted_keys = sorted(set(l_dict.keys()) | set(r_dict.keys()), key=str)
+            else:
+                sorted_keys = list(dict.fromkeys(list(l_dict.keys()) + list(r_dict.keys())))
 
             node = StructuredNode(name=name, path=path, node_type="object")
             node_status = "equal"
@@ -371,8 +384,22 @@ class StructuredDiffEngine:
             )
 
     @classmethod
+    def _strict_equals(cls, a: Any, b: Any) -> bool:
+        if type(a) is not type(b):
+            return False
+        if isinstance(a, dict):
+            return a.keys() == b.keys() and all(cls._strict_equals(a[k], b[k]) for k in a)
+        if isinstance(a, list):
+            return len(a) == len(b) and all(cls._strict_equals(x, y) for x, y in zip(a, b))
+        return a == b
+
+    @classmethod
     def _compare_xml_nodes(cls, l_elem: ET.Element, r_elem: ET.Element, path: str) -> StructuredNode:
-        tag = l_elem.tag if l_elem is not None else (r_elem.tag if r_elem is not None else "elem")
+        tag_mismatch = (l_elem is not None and r_elem is not None and l_elem.tag != r_elem.tag)
+        if tag_mismatch:
+            tag = f"{l_elem.tag} → {r_elem.tag}"
+        else:
+            tag = l_elem.tag if l_elem is not None else (r_elem.tag if r_elem is not None else "elem")
         node = StructuredNode(name=tag, path=path, node_type="element")
 
         l_text = (l_elem.text or "").strip() if l_elem is not None else None
@@ -415,7 +442,7 @@ class StructuredDiffEngine:
             node.status = "added"
         elif r_elem is None:
             node.status = "deleted"
-        elif l_text != r_text or any(c.status != "equal" for c in node.children):
+        elif tag_mismatch or l_text != r_text or any(c.status != "equal" for c in node.children):
             node.status = "modified"
         else:
             node.status = "equal"

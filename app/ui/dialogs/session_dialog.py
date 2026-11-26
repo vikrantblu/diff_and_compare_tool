@@ -1,6 +1,6 @@
 """
-Workspace Profile & Session Management Dialog
-Allows users to save and load named comparison profiles.
+Workspace Profile & Session Management Dialog (White / Light Theme)
+Allows users to save, load, and delete named comparison profiles.
 """
 
 from PySide6.QtWidgets import (
@@ -17,7 +17,7 @@ class SessionProfileDialog(QDialog):
     def __init__(self, parent=None, current_session_data=None):
         super().__init__(parent)
         self.setWindowTitle("Workspace Profiles")
-        self.resize(480, 360)
+        self.resize(500, 380)
         self.current_data = current_session_data or []
         self.selected_profile_name = None
 
@@ -29,12 +29,12 @@ class SessionProfileDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        title = QLabel("📁 Comparison Profiles & Workspaces")
-        title.setStyleSheet("font-size: 15px; font-weight: 700; color: #1f2328;")
+        title = QLabel("Comparison Profiles & Workspaces")
+        title.setStyleSheet("font-size: 15px; font-weight: 700; color: #1f2328; border: none; background: transparent;")
         layout.addWidget(title)
 
-        # Profile List
         self.list_profiles = QListWidget()
+        self.list_profiles.itemDoubleClicked.connect(lambda _: self._load_selected())
         self.list_profiles.setStyleSheet("""
             QListWidget {
                 border: 1px solid #cbd5e1;
@@ -49,7 +49,6 @@ class SessionProfileDialog(QDialog):
         """)
         layout.addWidget(self.list_profiles, 1)
 
-        # Save current session row
         save_frame = QFrame()
         s_layout = QHBoxLayout(save_frame)
         s_layout.setContentsMargins(0, 0, 0, 0)
@@ -68,8 +67,14 @@ class SessionProfileDialog(QDialog):
 
         layout.addWidget(save_frame)
 
-        # Bottom buttons
         btn_layout = QHBoxLayout()
+
+        self.btn_delete = QPushButton(" Delete Selected")
+        self.btn_delete.setIcon(get_line_icon("trash", "#cf222e"))
+        self.btn_delete.setFixedHeight(30)
+        self.btn_delete.clicked.connect(self._delete_selected)
+        btn_layout.addWidget(self.btn_delete)
+
         btn_layout.addStretch()
 
         self.btn_close = QPushButton("Cancel")
@@ -101,6 +106,14 @@ class SessionProfileDialog(QDialog):
         SessionManager.save_profile(name, self.current_data)
         self.txt_profile_name.clear()
         self._refresh_list()
+
+    def _delete_selected(self):
+        item = self.list_profiles.currentItem()
+        if not item:
+            return
+        name = item.text()
+        if SessionManager.delete_profile(name):
+            self._refresh_list()
 
     def _load_selected(self):
         item = self.list_profiles.currentItem()

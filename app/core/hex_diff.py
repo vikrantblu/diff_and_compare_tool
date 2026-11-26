@@ -33,13 +33,15 @@ class HexDiffSummary:
     total_rows: int
     differing_bytes_count: int
     difference_percentage: float
-    mismatched_rows: List[int]  # List of row indices with differences
+    mismatched_rows: List[int]  # List of row indices with differences (capped for huge files)
+    mismatched_rows_truncated: bool = False
 
 
 class HexDiffEngine:
     """Core memory-mapped binary differencing engine."""
 
     BYTES_PER_ROW = 16
+    MAX_TRACKED_MISMATCH_ROWS = 500000
 
     @classmethod
     def compare_files_summary(cls, path1: str, path2: str) -> Optional[HexDiffSummary]:
@@ -52,9 +54,18 @@ class HexDiffEngine:
         total_rows = (max_size + cls.BYTES_PER_ROW - 1) // cls.BYTES_PER_ROW
 
         differing_bytes = 0
-        mismatched_rows = []
+        mismatched_rows: List[int] = []
+        truncated = False
 
-        # Read in 64KB blocks to quickly detect mismatched rows
+        def _record_row(r_idx: int):
+            nonlocal truncated
+            if len(mismatched_rows) >= cls.MAX_TRACKED_MISMATCH_ROWS:
+                truncated = True
+                return
+            if not mismatched_rows or mismatched_rows[-1] != r_idx:
+                mismatched_rows.append(r_idx)
+
+        # Read in 64KB blocks with fast identical-block & identical-row short-circuits
         block_size = 65536
         with open(path1, "rb") as f1, open(path2, "rb") as f2:
             offset = 0
@@ -64,23 +75,32 @@ class HexDiffEngine:
                 if not c1 and not c2:
                     break
 
+                if c1 == c2:
+                    offset += len(c1)
+                    continue
+
                 min_len = min(len(c1), len(c2))
-                for i in range(min_len):
-                    if c1[i] != c2[i]:
-                        differing_bytes += 1
-                        r_idx = (offset + i) // cls.BYTES_PER_ROW
-                        if not mismatched_rows or mismatched_rows[-1] != r_idx:
-                            mismatched_rows.append(r_idx)
+                row_step = cls.BYTES_PER_ROW
+                for base in range(0, min_len, row_step):
+                    end = min(base + row_step, min_len)
+                    if c1[base:end] == c2[base:end]:
+                        continue
+                    r_idx = (offset + base) // row_step
+                    _record_row(r_idx)
+                    for i in range(base, end):
+                        if c1[i] != c2[i]:
+                            differing_bytes += 1
 
                 # Tail difference if one file ended earlier
                 if len(c1) != len(c2):
                     excess = abs(len(c1) - len(c2))
                     differing_bytes += excess
                     start_tail = offset + min_len
-                    for i in range(excess):
-                        r_idx = (start_tail + i) // cls.BYTES_PER_ROW
-                        if not mismatched_rows or mismatched_rows[-1] != r_idx:
-                            mismatched_rows.append(r_idx)
+                    end_tail = start_tail + excess
+                    first_row = start_tail // row_step
+                    last_row = (end_tail - 1) // row_step
+                    for r_idx in range(first_row, last_row + 1):
+                        _record_row(r_idx)
 
                 offset += max(len(c1), len(c2))
 
@@ -92,8 +112,22 @@ class HexDiffEngine:
             total_rows=total_rows,
             differing_bytes_count=differing_bytes,
             difference_percentage=diff_pct,
-            mismatched_rows=mismatched_rows
+            mismatched_rows=mismatched_rows,
+            mismatched_rows_truncated=truncated
         )
+
+    @staticmethod
+    def find_pattern(path: str, needle: bytes, start_offset: int = 0) -> Optional[int]:
+        """Streams a file via mmap to locate the first occurrence of `needle` at or after `start_offset`."""
+        if not needle or not path or not os.path.exists(path):
+            return None
+        size = os.path.getsize(path)
+        if size == 0 or start_offset >= size:
+            return None
+        with open(path, "rb") as f:
+            with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                pos = mm.find(needle, max(0, start_offset))
+                return pos if pos != -1 else None
 
     @classmethod
     def read_row_range(

@@ -234,37 +234,28 @@ class ImageDiffEngine:
         img1.paste(raw_img1, (0, 0))
         img2.paste(raw_img2, (0, 0))
 
-        # Pixel delta calculation
+        # Vectorized C-level pixel delta calculation via ImageChops (avoids pure-Python per-pixel loop)
         total_pixels = max_w * max_h
+        diff_img = ImageChops.difference(img1, img2)
+        r_ch, g_ch, b_ch, a_ch = diff_img.split()
+        max_delta = ImageChops.lighter(ImageChops.lighter(r_ch, g_ch), ImageChops.lighter(b_ch, a_ch))
 
-        # Fast pixel analysis
-        pixels1 = img1.load()
-        pixels2 = img2.load()
-        heatmap = Image.new("RGBA", (max_w, max_h), (245, 245, 247, 255))
-        h_pixels = heatmap.load()
+        # Binary mask: 255 where max channel delta > tolerance, else 0
+        mask = max_delta.point(lambda v: 255 if v > tolerance else 0, mode="L")
+        hist = mask.histogram()
+        diff_count = hist[255] if len(hist) > 255 else 0
 
-        diff_count = 0
+        # Compose grayscale muted background + vivid intensity-scaled difference overlay
+        gray_bg = img1.convert("L").convert("RGBA")
+        gray_bg.putalpha(60)
+        bg_canvas = Image.new("RGBA", (max_w, max_h), (245, 245, 247, 255))
+        bg_canvas.alpha_composite(gray_bg)
 
-        for y in range(max_h):
-            for x in range(max_w):
-                p1 = pixels1[x, y]
-                p2 = pixels2[x, y]
-                dr = abs(p1[0] - p2[0])
-                dg = abs(p1[1] - p2[1])
-                db = abs(p1[2] - p2[2])
-                da = abs(p1[3] - p2[3])
+        intensity_alpha = max_delta.point(lambda d: min(255, 120 + int(d * 0.5)))
+        overlay = Image.new("RGBA", (max_w, max_h), (highlight_color[0], highlight_color[1], highlight_color[2], 255))
+        overlay.putalpha(intensity_alpha)
 
-                delta = max(dr, dg, db, da)
-                if delta > tolerance:
-                    diff_count += 1
-                    # Highlight diff in vivid magenta/neon
-                    intensity = min(255, 120 + int(delta * 0.5))
-                    h_pixels[x, y] = (highlight_color[0], highlight_color[1], highlight_color[2], intensity)
-                else:
-                    # Muted grayscale background
-                    gray = int(0.299 * p1[0] + 0.587 * p1[1] + 0.114 * p1[2])
-                    h_pixels[x, y] = (gray, gray, gray, 60)
-
+        heatmap = Image.composite(overlay, bg_canvas, mask)
         diff_pct = (diff_count / total_pixels) * 100.0 if total_pixels > 0 else 0.0
 
         return ImageDiffResult(

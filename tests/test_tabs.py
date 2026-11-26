@@ -5,13 +5,16 @@ and can be reopened without failing.
 """
 
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 from PySide6.QtWidgets import QApplication, QTabBar
 
 # Ensure repo root is on sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from app.core.session_manager import SessionManager
 from app.ui.main_window import MainWindow
 from app.ui.image_diff_view import ImageDiffView
 from app.ui.diff_view import DiffView
@@ -29,13 +32,20 @@ class TestTabLifecycle(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
+        # Isolate SessionManager so tests never read or pollute user session state
+        self._tmp_session_dir = tempfile.mkdtemp()
+        self._orig_storage_dir = SessionManager.get_storage_dir
+        SessionManager.get_storage_dir = classmethod(lambda cls, d=self._tmp_session_dir: d)
         # Disable modal crash recovery dialog during automated testing
         self._orig_recovery = MainWindow._check_crash_recovery
         MainWindow._check_crash_recovery = lambda self: None
         self.win = MainWindow()
 
     def tearDown(self):
+        self.win.close()
         MainWindow._check_crash_recovery = self._orig_recovery
+        SessionManager.get_storage_dir = self._orig_storage_dir
+        shutil.rmtree(self._tmp_session_dir, ignore_errors=True)
 
     def test_startup_has_only_home_tab(self):
         """At startup, only the Home dashboard tab should be open."""

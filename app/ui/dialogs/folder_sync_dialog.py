@@ -1,23 +1,41 @@
 """
-Folder Synchronization Preview & Execution Dialog
-Displays interactive action table before performing sync:
-- Mirror Left-to-Right
-- Bi-directional Sync
-- Update Left / Update Right
+Folder Synchronization Preview & Execution Dialog (White / Light Theme)
+Displays interactive action table with per-row checkboxes, Recycle Bin safety option,
+and background QThread execution so the UI stays responsive.
 """
 
-import os
+import sys
+from typing import List
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QComboBox, QHeaderView,
-    QProgressBar, QMessageBox, QFrame
+    QProgressBar, QMessageBox, QFrame, QCheckBox
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont
-from app.core.folder_sync_engine import FolderSyncEngine, SyncActionItem
+from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QColor
+
+from app.core.folder_sync_engine import FolderSyncEngine, SyncActionItem, SyncExecutionSummary
 from app.core.folder_compare_engine import FolderCompareItem
 from app.ui.styles.icons import get_line_icon
-from typing import List
+
+
+class FolderSyncWorker(QThread):
+    """Executes folder sync actions on a background thread."""
+    progress = Signal(int, int, str)
+    finished = Signal(object)
+
+    def __init__(self, plan: List[SyncActionItem], use_recycle_bin: bool):
+        super().__init__()
+        self.plan = plan
+        self.use_recycle_bin = use_recycle_bin
+
+    def run(self):
+        summary = FolderSyncEngine.execute_sync(
+            self.plan,
+            progress_callback=lambda c, t, m: self.progress.emit(c, t, m),
+            use_recycle_bin=self.use_recycle_bin
+        )
+        self.finished.emit(summary)
 
 
 class FolderSyncDialog(QDialog):
@@ -26,11 +44,12 @@ class FolderSyncDialog(QDialog):
     def __init__(self, parent, items: List[FolderCompareItem], left_dir: str, right_dir: str):
         super().__init__(parent)
         self.setWindowTitle("Folder Synchronization Hub — diff_and_compare")
-        self.resize(880, 560)
+        self.resize(900, 580)
         self.items = items
         self.left_dir = left_dir
         self.right_dir = right_dir
         self.current_plan: List[SyncActionItem] = []
+        self._worker: FolderSyncWorker = None
 
         self.setup_ui()
         self.refresh_plan()
@@ -40,19 +59,20 @@ class FolderSyncDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
 
-        # Header Title
         lbl_title = QLabel("Folder Synchronization Hub")
-        lbl_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #0f172a;")
+        lbl_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #0f172a; border: none; background: transparent;")
         layout.addWidget(lbl_title)
 
-        # Mode Selection Bar
         mode_bar = QFrame()
         mode_bar.setStyleSheet("background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px;")
         mb_layout = QHBoxLayout(mode_bar)
         mb_layout.setContentsMargins(8, 6, 8, 6)
         mb_layout.setSpacing(10)
 
-        mb_layout.addWidget(QLabel("Sync Mode:"))
+        lbl_m = QLabel("Sync Mode:")
+        lbl_m.setStyleSheet("font-weight: 600; border: none; background: transparent;")
+        mb_layout.addWidget(lbl_m)
+
         self.combo_mode = QComboBox()
         self.combo_mode.setFixedHeight(30)
         self.combo_mode.addItem("Mirror Left to Right (Overwrite & Prune Orphans)", FolderSyncEngine.MODE_MIRROR_L2R)
@@ -63,28 +83,36 @@ class FolderSyncDialog(QDialog):
         mb_layout.addWidget(self.combo_mode, 1)
 
         self.lbl_stats = QLabel("Calculating plan...")
-        self.lbl_stats.setStyleSheet("font-weight: 600; color: #0969da;")
+        self.lbl_stats.setStyleSheet("font-weight: 600; color: #0969da; border: none; background: transparent;")
         mb_layout.addWidget(self.lbl_stats)
 
         layout.addWidget(mode_bar)
 
-        # Action Table
+        # Action Table with Include Checkboxes
         self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Action", "Relative Path", "Size", "Reason"])
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["Include", "Action", "Relative Path", "Size", "Reason"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.itemChanged.connect(self._update_selected_stats)
         layout.addWidget(self.table, 1)
 
-        # Progress bar (hidden until execution)
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.progress_bar.setFixedHeight(20)
         layout.addWidget(self.progress_bar)
 
-        # Bottom Button Bar
         btn_bar = QHBoxLayout()
+        self.chk_recycle_bin = QCheckBox("Move deleted files to Recycle Bin (Safe Delete)")
+        self.chk_recycle_bin.setChecked(sys.platform == "win32")
+        self.chk_recycle_bin.setVisible(sys.platform == "win32")
+        btn_bar.addWidget(self.chk_recycle_bin)
+
         btn_bar.addStretch()
 
         self.btn_cancel = QPushButton("Cancel")
@@ -96,18 +124,6 @@ class FolderSyncDialog(QDialog):
         self.btn_execute.setIcon(get_line_icon("refresh", "#ffffff"))
         self.btn_execute.setFixedHeight(32)
         self.btn_execute.setObjectName("PrimaryButton")
-        self.btn_execute.setStyleSheet("""
-            QPushButton#PrimaryButton {
-                background-color: #0969da;
-                color: #ffffff;
-                font-weight: 600;
-                padding: 4px 16px;
-                border-radius: 6px;
-            }
-            QPushButton#PrimaryButton:hover {
-                background-color: #0854ad;
-            }
-        """)
         self.btn_execute.clicked.connect(self.execute_sync)
         btn_bar.addWidget(self.btn_execute)
 
@@ -117,25 +133,21 @@ class FolderSyncDialog(QDialog):
         mode = self.combo_mode.currentData()
         self.current_plan = FolderSyncEngine.plan_sync(self.items, self.left_dir, self.right_dir, mode=mode)
 
+        self.table.blockSignals(True)
         self.table.setRowCount(len(self.current_plan))
-        copy_count = 0
-        del_count = 0
-        total_bytes = 0
 
         for r_idx, act in enumerate(self.current_plan):
-            if act.action.startswith("copy"):
-                copy_count += 1
-                total_bytes += act.size
-            elif act.action.startswith("delete"):
-                del_count += 1
+            chk_item = QTableWidgetItem()
+            chk_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            chk_item.setCheckState(Qt.Checked)
 
-            # Action Item with Icon/Badge
             act_text = "Copy L ➜ R" if act.action == "copy_l2r" else (
                 "Copy R ➜ L" if act.action == "copy_r2l" else (
                     "Delete on Right" if act.action == "delete_r" else "Delete on Left"
                 )
             )
             item_act = QTableWidgetItem(act_text)
+            item_act.setFlags(item_act.flags() & ~Qt.ItemIsEditable)
             if "delete" in act.action:
                 item_act.setForeground(QColor("#cf222e"))
             elif act.action == "copy_l2r":
@@ -144,58 +156,82 @@ class FolderSyncDialog(QDialog):
                 item_act.setForeground(QColor("#0969da"))
 
             item_path = QTableWidgetItem(act.rel_path)
+            item_path.setFlags(item_path.flags() & ~Qt.ItemIsEditable)
             item_size = QTableWidgetItem(f"{act.size:,} B" if act.size > 0 else "")
+            item_size.setFlags(item_size.flags() & ~Qt.ItemIsEditable)
             item_reason = QTableWidgetItem(act.reason)
+            item_reason.setFlags(item_reason.flags() & ~Qt.ItemIsEditable)
 
-            self.table.setItem(r_idx, 0, item_act)
-            self.table.setItem(r_idx, 1, item_path)
-            self.table.setItem(r_idx, 2, item_size)
-            self.table.setItem(r_idx, 3, item_reason)
+            self.table.setItem(r_idx, 0, chk_item)
+            self.table.setItem(r_idx, 1, item_act)
+            self.table.setItem(r_idx, 2, item_path)
+            self.table.setItem(r_idx, 3, item_size)
+            self.table.setItem(r_idx, 4, item_reason)
 
-        mb_str = f"{total_bytes / (1024*1024):.2f} MB"
+        self.table.blockSignals(False)
+        self._update_selected_stats()
+
+    def _get_selected_plan(self) -> List[SyncActionItem]:
+        selected: List[SyncActionItem] = []
+        for r_idx, act in enumerate(self.current_plan):
+            item = self.table.item(r_idx, 0)
+            if item and item.checkState() == Qt.Checked:
+                selected.append(act)
+        return selected
+
+    def _update_selected_stats(self):
+        selected = self._get_selected_plan()
+        copy_count = sum(1 for a in selected if a.action.startswith("copy"))
+        del_count = sum(1 for a in selected if a.action.startswith("delete"))
+        total_bytes = sum(a.size for a in selected if a.action.startswith("copy"))
+        mb_str = f"{total_bytes / (1024 * 1024):.2f} MB"
         self.lbl_stats.setText(f"{copy_count} to copy ({mb_str}) | {del_count} to delete")
-        self.btn_execute.setEnabled(len(self.current_plan) > 0)
+        self.btn_execute.setEnabled(len(selected) > 0)
 
     def execute_sync(self):
-        if not self.current_plan:
+        selected_plan = self._get_selected_plan()
+        if not selected_plan:
             return
 
         confirm = QMessageBox.question(
             self,
             "Confirm Folder Synchronization",
-            f"Are you sure you want to execute {len(self.current_plan)} sync actions?\n\n"
+            f"Are you sure you want to execute {len(selected_plan)} selected sync action(s)?\n\n"
             f"Target Left: {self.left_dir}\n"
-            f"Target Right: {self.right_dir}\n\n"
-            f"This will copy/overwrite files and delete pruned orphans.",
+            f"Target Right: {self.right_dir}",
             QMessageBox.Yes | QMessageBox.No
         )
         if confirm != QMessageBox.Yes:
             return
 
         self.progress_bar.setVisible(True)
-        self.progress_bar.setRange(0, len(self.current_plan))
+        self.progress_bar.setRange(0, len(selected_plan))
         self.btn_execute.setEnabled(False)
         self.btn_cancel.setEnabled(False)
 
-        def cb(cur, total, msg):
-            self.progress_bar.setValue(cur)
-            self.lbl_stats.setText(msg)
+        use_recycle = self.chk_recycle_bin.isChecked() if sys.platform == "win32" else False
+        self._worker = FolderSyncWorker(selected_plan, use_recycle)
+        self._worker.progress.connect(self._on_sync_progress)
+        self._worker.finished.connect(self._on_sync_finished)
+        self._worker.start()
 
-        summary = FolderSyncEngine.execute_sync(self.current_plan, progress_callback=cb)
+    def _on_sync_progress(self, cur: int, total: int, msg: str):
+        self.progress_bar.setValue(cur)
+        self.lbl_stats.setText(msg)
 
+    def _on_sync_finished(self, summary: SyncExecutionSummary):
         if summary.success:
             QMessageBox.information(
                 self,
                 "Synchronization Succeeded",
                 f"Successfully completed synchronization!\n\n"
                 f"• Copied/Updated: {summary.copied_count} files\n"
-                f"• Deleted Orphans: {summary.deleted_count} files"
+                f"• Deleted/Moved to Bin: {summary.deleted_count} files"
             )
-            self.accept()
         else:
             QMessageBox.warning(
                 self,
                 "Synchronization Completed with Warnings",
                 f"Completed with {len(summary.errors)} error(s):\n\n" + "\n".join(summary.errors[:5])
             )
-            self.accept()
+        self.accept()

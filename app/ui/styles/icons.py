@@ -3,7 +3,9 @@ Modern Vector Line Icon Provider (Feather / Lucide style)
 Renders high-DPI vector SVG line icons dynamically with theme-aware stroke colors.
 """
 
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor
+import os
+import sys
+from PySide6.QtGui import QIcon, QPixmap, QPainter
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtCore import QByteArray, Qt
 
@@ -13,6 +15,8 @@ SVG_ICONS = {
     "arrow-down": """<polyline points="6 9 12 15 18 9"></polyline>""",
     "arrow-left": """<line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline>""",
     "arrow-right": """<line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline>""",
+    "chevron-left": """<polyline points="15 18 9 12 15 6"></polyline>""",
+    "chevron-right": """<polyline points="9 18 15 12 9 6"></polyline>""",
     "swap": """<polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line>""",
     "save": """<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline>""",
     "folder": """<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>""",
@@ -20,11 +24,11 @@ SVG_ICONS = {
     "file-text": """<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>""",
     "diff": """<rect x="2" y="3" width="9" height="18" rx="2"></rect><rect x="13" y="3" width="9" height="18" rx="2"></rect><line x1="6.5" y1="8" x2="6.5" y2="16"></line><line x1="17.5" y1="8" x2="17.5" y2="16"></line>""",
     "git-merge": """<circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><path d="M6 21V9a9 9 0 0 0 9 9"></path>""",
+    "git-commit": """<circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line>""",
     "check": """<polyline points="20 6 9 17 4 12"></polyline>""",
     "layers": """<polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline>""",
     "refresh": """<polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>""",
     "sun": """<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>""",
-    "moon": """<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>""",
     "align-justify": """<line x1="21" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="21" y1="18" x2="3" y2="18"></line>""",
     "zap": """<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>""",
     "image": """<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>""",
@@ -45,18 +49,31 @@ SVG_ICONS = {
     "text-merge": """<rect x="2" y="2.5" width="8" height="9" rx="1.5"></rect><rect x="14" y="2.5" width="8" height="9" rx="1.5"></rect><rect x="8" y="13" width="8" height="9" rx="1.5"></rect><path d="M6 11.5v1.5a1.5 1.5 0 0 0 1.5 1.5H8"></path><path d="M18 11.5v1.5a1.5 1.5 0 0 1-1.5 1.5H16"></path>""",
     "search": """<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>""",
     "undo": """<polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>""",
-    "redo": """<polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>"""
+    "redo": """<polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>""",
+    "shield": """<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline>""",
+    "zoom-in": """<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line>""",
+    "zoom-out": """<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line>""",
+    "maximize": """<polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line>""",
+    "clipboard": """<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>""",
+    "trash": """<polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>""",
+    "copy": """<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>""",
+    "edit": """<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>""",
+    "wrap": """<polyline points="17 10 21 14 17 18"></polyline><path d="M3 6h18"></path><path d="M3 14h15a3 3 0 0 0 0-6"></path><path d="M3 18h7"></path>""",
+    "eye": """<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>""",
+    "hash": """<line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line><line x1="10" y1="3" x2="8" y2="21"></line><line x1="16" y1="3" x2="14" y2="21"></line>""",
 }
 
 
 def get_line_icon(name: str, color: str = "#24292f", size: int = 16) -> QIcon:
-    """
-    Renders a crisp vector line icon as a QIcon.
-    """
+    """Renders a crisp vector line icon as a QIcon."""
     inner = SVG_ICONS.get(name, SVG_ICONS["file-text"])
-    svg_template = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{inner}</svg>"""
+    svg_template = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
+        f'viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" '
+        f'stroke-linecap="round" stroke-linejoin="round">{inner}</svg>'
+    )
 
-    renderer = QSvgRenderer(QByteArray(svg_template.encode('utf-8')))
+    renderer = QSvgRenderer(QByteArray(svg_template.encode("utf-8")))
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.transparent)
 
@@ -69,14 +86,15 @@ def get_line_icon(name: str, color: str = "#24292f", size: int = 16) -> QIcon:
 
 
 def get_line_pixmap(name: str, color: str = "#24292f", size: int = 48) -> QPixmap:
-    """
-    Renders a high-DPI vector pixmap directly at the exact requested pixel size.
-    Prevents any raster upscaling blurriness.
-    """
+    """Renders a high-DPI vector pixmap directly at the exact requested pixel size."""
     inner = SVG_ICONS.get(name, SVG_ICONS.get("file-text", ""))
-    svg_template = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{inner}</svg>"""
+    svg_template = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
+        f'viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.8" '
+        f'stroke-linecap="round" stroke-linejoin="round">{inner}</svg>'
+    )
 
-    renderer = QSvgRenderer(QByteArray(svg_template.encode('utf-8')))
+    renderer = QSvgRenderer(QByteArray(svg_template.encode("utf-8")))
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.transparent)
 
@@ -88,25 +106,35 @@ def get_line_pixmap(name: str, color: str = "#24292f", size: int = 48) -> QPixma
     return pixmap
 
 
+def _find_asset(filename: str) -> str:
+    """Resolves an asset inside assets/ across source tree and frozen PyInstaller bundles."""
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    cand = os.path.join(base_dir, "assets", filename)
+    if os.path.isfile(cand):
+        return cand
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        bundled = os.path.join(meipass, "assets", filename)
+        if os.path.isfile(bundled):
+            return bundled
+    return ""
+
+
 def get_app_icon() -> QIcon:
     """Returns the official diff_and_compare_tool application icon."""
-    import os
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    ico_path = os.path.join(base_dir, "assets", "app_icon.ico")
-    if os.path.isfile(ico_path):
+    ico_path = _find_asset("app_icon.ico")
+    if ico_path:
         return QIcon(ico_path)
-    png_path = os.path.join(base_dir, "assets", "app_icon.png")
-    if os.path.isfile(png_path):
+    png_path = _find_asset("app_icon.png")
+    if png_path:
         return QIcon(png_path)
     return get_line_icon("diff", "#0969da", 32)
 
 
 def get_app_icon_pixmap(size: int = 64) -> QPixmap:
     """Returns a high-DPI pixmap of the application icon."""
-    import os
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    png_path = os.path.join(base_dir, "assets", "app_icon.png")
-    if os.path.isfile(png_path):
+    png_path = _find_asset("app_icon.png")
+    if png_path:
         pm = QPixmap(png_path)
         return pm.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
     return get_line_pixmap("diff", "#0969da", size)

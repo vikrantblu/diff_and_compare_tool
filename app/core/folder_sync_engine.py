@@ -8,11 +8,13 @@ Supports signature folder sync operations:
 """
 
 import os
+import sys
 import shutil
 import time
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple, Callable
 from app.core.folder_compare_engine import FolderCompareItem
+from app.core.file_io import is_vfs_path, read_vfs_or_file_bytes
 
 
 @dataclass
@@ -210,17 +212,71 @@ class FolderSyncEngine:
 
         return plan
 
+    @staticmethod
+    def _send_to_recycle_bin(path: str) -> bool:
+        """Moves a file or folder to the Windows Recycle Bin using SHFileOperationW."""
+        if sys.platform != "win32":
+            return False
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class SHFILEOPSTRUCTW(ctypes.Structure):
+                _fields_ = [
+                    ("hwnd", wintypes.HWND),
+                    ("wFunc", ctypes.c_uint),
+                    ("pFrom", wintypes.LPCWSTR),
+                    ("pTo", wintypes.LPCWSTR),
+                    ("fFlags", ctypes.c_ushort),
+                    ("fAnyOperationsAborted", wintypes.BOOL),
+                    ("hNameMappings", ctypes.c_void_p),
+                    ("lpszProgressTitle", wintypes.LPCWSTR),
+                ]
+
+            FO_DELETE = 3
+            FOF_SILENT = 0x0004
+            FOF_NOCONFIRMATION = 0x0010
+            FOF_ALLOWUNDO = 0x0040
+            FOF_NOERRORUI = 0x0400
+
+            op = SHFILEOPSTRUCTW()
+            op.hwnd = None
+            op.wFunc = FO_DELETE
+            # SHFileOperationW requires double-null-terminated string
+            op.pFrom = os.path.abspath(path) + "\0\0"
+            op.pTo = None
+            op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI
+            op.fAnyOperationsAborted = False
+            op.hNameMappings = None
+            op.lpszProgressTitle = None
+
+            res = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(op))
+            return res == 0 and not op.fAnyOperationsAborted
+        except Exception:
+            return False
+
+    @classmethod
+    def _delete_path(cls, path: str, use_recycle_bin: bool = False):
+        if use_recycle_bin and cls._send_to_recycle_bin(path):
+            return
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+        elif os.path.exists(path):
+            os.remove(path)
+
     @classmethod
     def execute_sync(
         cls,
         plan: List[SyncActionItem],
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        use_recycle_bin: bool = False
     ) -> SyncExecutionSummary:
-        """Executes synchronization actions safely with timestamp preservation."""
+        """Executes synchronization actions safely with timestamp preservation and optional Recycle Bin delete."""
         total = len(plan)
         copied = 0
         deleted = 0
         errors: List[str] = []
+        pruned_parents = set()
 
         for idx, item in enumerate(plan):
             if progress_callback:
@@ -228,7 +284,7 @@ class FolderSyncEngine:
 
             try:
                 if item.action in ("copy_l2r", "copy_r2l"):
-                    if not item.source_path or not os.path.exists(item.source_path):
+                    if not item.source_path or (not is_vfs_path(item.source_path) and not os.path.exists(item.source_path)):
                         errors.append(f"Source file not found: {item.source_path}")
                         continue
                     if not item.target_path:
@@ -237,22 +293,33 @@ class FolderSyncEngine:
                     target_dir = os.path.dirname(item.target_path)
                     os.makedirs(target_dir, exist_ok=True)
 
-                    # Copy content and preserve timestamps
-                    shutil.copy2(item.source_path, item.target_path)
+                    if is_vfs_path(item.source_path):
+                        raw = read_vfs_or_file_bytes(item.source_path)
+                        with open(item.target_path, "wb") as out_f:
+                            out_f.write(raw)
+                    else:
+                        shutil.copy2(item.source_path, item.target_path)
                     copied += 1
 
                 elif item.action in ("delete_r", "delete_l"):
                     if item.target_path and os.path.exists(item.target_path):
-                        if os.path.isdir(item.target_path):
-                            shutil.rmtree(item.target_path, ignore_errors=True)
-                        else:
-                            os.remove(item.target_path)
+                        parent = os.path.dirname(item.target_path)
+                        cls._delete_path(item.target_path, use_recycle_bin=use_recycle_bin)
                         deleted += 1
+                        if parent:
+                            pruned_parents.add(parent)
 
             except Exception as e:
                 errors.append(f"Error {item.action} on {item.rel_path}: {e}")
 
-        # Clean empty folders after prune
+        # Clean empty folders left behind by deletions
+        for parent in sorted(pruned_parents, key=len, reverse=True):
+            try:
+                if os.path.isdir(parent) and not os.listdir(parent):
+                    os.rmdir(parent)
+            except OSError:
+                pass
+
         return SyncExecutionSummary(
             total_actions=total,
             copied_count=copied,

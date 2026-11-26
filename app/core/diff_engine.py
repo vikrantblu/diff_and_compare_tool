@@ -65,6 +65,10 @@ class DiffChunk:
     moved_partner_chunk_idx: Optional[int] = None
     moved_to_line: Optional[int] = None
     semantic_match_info: Optional[str] = None
+    raw_left_start: Optional[int] = None
+    raw_left_end: Optional[int] = None
+    raw_right_start: Optional[int] = None
+    raw_right_end: Optional[int] = None
 
 
 
@@ -91,6 +95,12 @@ class MergeConflictChunk:
     right_lines: List[str]  # Theirs
     resolved_lines: List[str] = field(default_factory=list)
     resolution_state: str = "unresolved"  # 'mine', 'theirs', 'base', 'both', 'custom', 'auto'
+    base_start: int = 0
+    base_end: int = 0
+    left_start: int = 0
+    left_end: int = 0
+    right_start: int = 0
+    right_end: int = 0
 
 
 class DiffEngine:
@@ -101,7 +111,12 @@ class DiffEngine:
         if regex_rules:
             for pattern, repl in regex_rules:
                 try:
-                    text = re.sub(pattern, repl, text)
+                    # Preserve newline count across multiline matches so normalized line indices stay aligned with raw lines
+                    def _preserve_lines(match: re.Match, r: str = repl) -> str:
+                        newlines = "\n" * match.group(0).count("\n")
+                        return newlines + r
+
+                    text = re.sub(pattern, _preserve_lines, text, flags=re.MULTILINE)
                 except re.error:
                     pass
 
@@ -146,7 +161,11 @@ class DiffEngine:
                 left_start=i1,
                 left_end=i2,
                 right_start=j1,
-                right_end=j2
+                right_end=j2,
+                raw_left_start=i1,
+                raw_left_end=i2,
+                raw_right_start=j1,
+                raw_right_end=j2
             )
             if tag == 'replace':
                 cls._compute_intraline_spans(chunk, left_raw[i1:i2], right_raw[j1:j2])
@@ -385,6 +404,56 @@ class DiffEngine:
                         r_counter += 1
                         row += 1
 
+                elif tag == 'moved':
+                    if sub_l and not sub_r:
+                        for line in sub_l:
+                            l_disp.append(line)
+                            r_disp.append("")
+                            l_nums[row] = l_counter
+                            r_spacers.add(row)
+                            l_counter += 1
+                            row += 1
+                    elif sub_r and not sub_l:
+                        for line in sub_r:
+                            l_disp.append("")
+                            r_disp.append(line)
+                            l_spacers.add(row)
+                            r_nums[row] = r_counter
+                            r_counter += 1
+                            row += 1
+                    else:
+                        pairs = cls.align_replace_block(sub_l, sub_r)
+                        for li, ri in pairs:
+                            line_l = sub_l[li] if li is not None else ""
+                            line_r = sub_r[ri] if ri is not None else ""
+                            if li is not None:
+                                l_disp.append(line_l)
+                                l_nums[row] = l_counter
+                                l_counter += 1
+                            else:
+                                l_disp.append("")
+                                l_spacers.add(row)
+                            if ri is not None:
+                                r_disp.append(line_r)
+                                r_nums[row] = r_counter
+                                r_counter += 1
+                            else:
+                                r_disp.append("")
+                                r_spacers.add(row)
+                            if li is not None and ri is not None and line_l != line_r:
+                                sp_l, sp_r = cls._compute_line_intraline(line_l, line_r)
+                                rel_k = row - c_start
+                                if sp_l:
+                                    c_left_spans[rel_k] = sp_l
+                                if sp_r:
+                                    c_right_spans[rel_k] = sp_r
+                            row += 1
+
+                raw_l1 = (start_l_real - 1) + chunk.left_start
+                raw_l2 = (start_l_real - 1) + chunk.left_end
+                raw_r1 = (start_r_real - 1) + chunk.right_start
+                raw_r2 = (start_r_real - 1) + chunk.right_end
+
                 aligned_chunks.append(DiffChunk(
                     tag=tag,
                     left_start=c_start,
@@ -396,17 +465,27 @@ class DiffEngine:
                     is_moved=chunk.is_moved,
                     moved_partner_chunk_idx=chunk.moved_partner_chunk_idx,
                     moved_to_line=chunk.moved_to_line,
-                    semantic_match_info=chunk.semantic_match_info
+                    semantic_match_info=chunk.semantic_match_info,
+                    raw_left_start=raw_l1,
+                    raw_left_end=raw_l2,
+                    raw_right_start=raw_r1,
+                    raw_right_end=raw_r2
                 ))
 
             return l_disp, r_disp, l_spacers, r_spacers, l_nums, r_nums, aligned_chunks, l_counter, r_counter, row
 
-        valid_anchors = []
+        valid_anchors: List[Tuple[int, int]] = []
         if manual_alignments:
-            valid_anchors = sorted(
+            sorted_candidates = sorted(
                 [(l, r) for l, r in manual_alignments if 1 <= l <= len(left_raw) and 1 <= r <= len(right_raw)],
-                key=lambda x: x[0]
+                key=lambda x: (x[0], x[1])
             )
+            # Enforce strict monotonic ordering on both sides so slices never cross or go negative
+            last_l, last_r = 0, 0
+            for l_a, r_a in sorted_candidates:
+                if l_a > last_l and r_a > last_r:
+                    valid_anchors.append((l_a, r_a))
+                    last_l, last_r = l_a, r_a
 
         if not valid_anchors:
             ld, rd, ls, rs, ln, rn, ac, _, _, _ = build_slice(left_raw, right_raw, 1, 1, 0)
@@ -437,22 +516,60 @@ class DiffEngine:
         prev_l = 0
         prev_r = 0
 
+        def _append_segment(seg_l: List[str], seg_r: List[str]):
+            nonlocal cur_row, cur_l_real, cur_r_real
+            if not seg_l and not seg_r:
+                return
+            if seg_l and seg_r:
+                ld, rd, ls, rs, ln, rn, ac, cur_l_real, cur_r_real, cur_row = build_slice(
+                    seg_l, seg_r, cur_l_real, cur_r_real, cur_row
+                )
+                all_ld.extend(ld)
+                all_rd.extend(rd)
+                all_ls.update(ls)
+                all_rs.update(rs)
+                all_ln.update(ln)
+                all_rn.update(rn)
+                all_chunks.extend(ac)
+            elif seg_l:
+                c_start = cur_row
+                r_l1 = cur_l_real - 1
+                for line in seg_l:
+                    all_ld.append(line)
+                    all_rd.append("")
+                    all_ln[cur_row] = cur_l_real
+                    all_rs.add(cur_row)
+                    cur_l_real += 1
+                    cur_row += 1
+                all_chunks.append(DiffChunk(
+                    tag='delete', left_start=c_start, left_end=cur_row,
+                    right_start=c_start, right_end=cur_row,
+                    raw_left_start=r_l1, raw_left_end=cur_l_real - 1,
+                    raw_right_start=cur_r_real - 1, raw_right_end=cur_r_real - 1
+                ))
+            else:
+                c_start = cur_row
+                r_r1 = cur_r_real - 1
+                for line in seg_r:
+                    all_ld.append("")
+                    all_rd.append(line)
+                    all_ls.add(cur_row)
+                    all_rn[cur_row] = cur_r_real
+                    cur_r_real += 1
+                    cur_row += 1
+                all_chunks.append(DiffChunk(
+                    tag='insert', left_start=c_start, left_end=cur_row,
+                    right_start=c_start, right_end=cur_row,
+                    raw_left_start=cur_l_real - 1, raw_left_end=cur_l_real - 1,
+                    raw_right_start=r_r1, raw_right_end=cur_r_real - 1
+                ))
+
         for l_anc, r_anc in valid_anchors:
             l_idx = l_anc - 1
             r_idx = r_anc - 1
             seg_l = left_raw[prev_l:l_idx]
             seg_r = right_raw[prev_r:r_idx]
-
-            ld, rd, ls, rs, ln, rn, ac, cur_l_real, cur_r_real, cur_row = build_slice(
-                seg_l, seg_r, cur_l_real, cur_r_real, cur_row
-            )
-            all_ld.extend(ld)
-            all_rd.extend(rd)
-            all_ls.update(ls)
-            all_rs.update(rs)
-            all_ln.update(ln)
-            all_rn.update(rn)
-            all_chunks.extend(ac)
+            _append_segment(seg_l, seg_r)
 
             # Pad spacers above anchor so left and right meet at the exact same row
             diff_len = len(all_ld) - len(all_rd)
@@ -490,7 +607,11 @@ class DiffEngine:
                 right_start=cur_row,
                 right_end=cur_row + 1,
                 left_char_spans=anc_l_spans,
-                right_char_spans=anc_r_spans
+                right_char_spans=anc_r_spans,
+                raw_left_start=l_idx,
+                raw_left_end=l_idx + 1,
+                raw_right_start=r_idx,
+                raw_right_end=r_idx + 1
             ))
             cur_row += 1
             cur_l_real = l_anc + 1
@@ -499,18 +620,7 @@ class DiffEngine:
             prev_r = r_idx + 1
 
         # Final segment
-        seg_l = left_raw[prev_l:]
-        seg_r = right_raw[prev_r:]
-        ld, rd, ls, rs, ln, rn, ac, _, _, _ = build_slice(
-            seg_l, seg_r, cur_l_real, cur_r_real, cur_row
-        )
-        all_ld.extend(ld)
-        all_rd.extend(rd)
-        all_ls.update(ls)
-        all_rs.update(rs)
-        all_ln.update(ln)
-        all_rn.update(rn)
-        all_chunks.extend(ac)
+        _append_segment(left_raw[prev_l:], right_raw[prev_r:])
 
         return AlignedDiffResult(
             left_display_lines=all_ld,
@@ -571,17 +681,14 @@ class DiffEngine:
 
     @classmethod
     def compute_3way_merge(cls, base_text: str, left_text: str, right_text: str) -> List[MergeConflictChunk]:
+        """
+        Interval-based diff3 3-way merge algorithm.
+        Properly tracks zero-width mid-file insertions, overlapping edits, and tail insertions,
+        annotating base/left/right line intervals on every emitted chunk.
+        """
         base_lines = base_text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
         left_lines = left_text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
         right_lines = right_text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
-
-        s_left = difflib.SequenceMatcher(None, base_lines, left_lines)
-        s_right = difflib.SequenceMatcher(None, base_lines, right_lines)
-
-        left_ops = list(s_left.get_opcodes())
-        right_ops = list(s_right.get_opcodes())
-
-        merge_chunks: List[MergeConflictChunk] = []
 
         if left_text == right_text:
             return [MergeConflictChunk(
@@ -590,30 +697,120 @@ class DiffEngine:
                 left_lines=left_lines,
                 right_lines=right_lines,
                 resolved_lines=left_lines,
-                resolution_state="auto"
+                resolution_state="auto",
+                base_start=0,
+                base_end=len(base_lines),
+                left_start=0,
+                left_end=len(left_lines),
+                right_start=0,
+                right_end=len(right_lines)
             )]
 
-        b_pos = 0
-        while b_pos < len(base_lines):
-            l_op = next((op for op in left_ops if op[1] <= b_pos < op[2]), None)
-            r_op = next((op for op in right_ops if op[1] <= b_pos < op[2]), None)
+        s_left = difflib.SequenceMatcher(None, base_lines, left_lines)
+        s_right = difflib.SequenceMatcher(None, base_lines, right_lines)
+        left_ops = [op for op in s_left.get_opcodes() if op[0] != 'equal']
+        right_ops = [op for op in s_right.get_opcodes() if op[0] != 'equal']
 
-            if not l_op and not r_op:
+        # Collect all base intervals touched by either side (including zero-width insertions i1 == i2)
+        all_intervals: List[Tuple[int, int]] = [(op[1], op[2]) for op in left_ops] + [(op[1], op[2]) for op in right_ops]
+        if not all_intervals:
+            return [MergeConflictChunk(
+                is_conflict=False,
+                base_lines=base_lines,
+                left_lines=left_lines,
+                right_lines=right_lines,
+                resolved_lines=base_lines,
+                resolution_state="auto",
+                base_start=0,
+                base_end=len(base_lines),
+                left_start=0,
+                left_end=len(left_lines),
+                right_start=0,
+                right_end=len(right_lines)
+            )]
+
+        # Sort and merge overlapping/touching base intervals.
+        # Note: a zero-width insert (p, p) overlaps another interval (a, b) if a <= p <= b.
+        all_intervals.sort(key=lambda iv: (iv[0], iv[1]))
+        merged_intervals: List[Tuple[int, int]] = []
+        for s, e in all_intervals:
+            if not merged_intervals:
+                merged_intervals.append((s, e))
+                continue
+            ps, pe = merged_intervals[-1]
+            if s < pe or (s == pe and (s == e or ps == pe)):
+                merged_intervals[-1] = (ps, max(pe, e))
+            else:
+                merged_intervals.append((s, e))
+
+        def _base_to_side_pos(ops: List[Tuple[str, int, int, int, int]], b_pos: int, side_len: int) -> int:
+            """Maps a base line boundary to the corresponding target line boundary."""
+            offset = 0
+            for tag, b1, b2, t1, t2 in ops:
+                if b2 <= b_pos:
+                    offset = t2 - b2
+                elif b1 <= b_pos < b2:
+                    # Inside an edit block; caller slices whole merged interval so return boundary
+                    return t1
+                else:
+                    break
+            return max(0, min(side_len, b_pos + offset))
+
+        def _map_interval(ops: List[Tuple[str, int, int, int, int]], b_start: int, b_end: int, side_len: int) -> Tuple[int, int]:
+            overlapping = [
+                op for op in ops
+                if (op[1] < b_end and op[2] > b_start) or (op[1] == op[2] and b_start <= op[1] <= b_end)
+            ]
+            if not overlapping:
+                t_start = _base_to_side_pos(ops, b_start, side_len)
+                t_end = _base_to_side_pos(ops, b_end, side_len)
+                return t_start, max(t_start, t_end)
+            first = overlapping[0]
+            last = overlapping[-1]
+            t_start = first[3] - (first[1] - b_start) if b_start < first[1] else first[3]
+            t_end = last[4] + (b_end - last[2]) if b_end > last[2] else last[4]
+            return max(0, t_start), min(side_len, max(t_start, t_end))
+
+        merge_chunks: List[MergeConflictChunk] = []
+        b_cursor = 0
+        l_cursor = 0
+        r_cursor = 0
+
+        for b_s, b_e in merged_intervals:
+            if b_s > b_cursor:
+                eq_len = b_s - b_cursor
+                eq_base = base_lines[b_cursor:b_s]
                 merge_chunks.append(MergeConflictChunk(
                     is_conflict=False,
-                    base_lines=[base_lines[b_pos]],
-                    left_lines=[base_lines[b_pos]],
-                    right_lines=[base_lines[b_pos]],
-                    resolved_lines=[base_lines[b_pos]],
-                    resolution_state="auto"
+                    base_lines=eq_base,
+                    left_lines=eq_base,
+                    right_lines=eq_base,
+                    resolved_lines=eq_base,
+                    resolution_state="auto",
+                    base_start=b_cursor,
+                    base_end=b_s,
+                    left_start=l_cursor,
+                    left_end=l_cursor + eq_len,
+                    right_start=r_cursor,
+                    right_end=r_cursor + eq_len
                 ))
-                b_pos += 1
-                continue
+                l_cursor += eq_len
+                r_cursor += eq_len
 
-            b_end = max(l_op[2] if l_op else b_pos + 1, r_op[2] if r_op else b_pos + 1)
-            cur_base = base_lines[b_pos:b_end]
-            cur_left = left_lines[l_op[3]:l_op[4]] if l_op else cur_base
-            cur_right = right_lines[r_op[3]:r_op[4]] if r_op else cur_base
+            l_s, l_e = _map_interval(left_ops, b_s, b_e, len(left_lines))
+            r_s, r_e = _map_interval(right_ops, b_s, b_e, len(right_lines))
+            cur_base = base_lines[b_s:b_e]
+            cur_left = left_lines[l_s:l_e]
+            cur_right = right_lines[r_s:r_e]
+
+            left_changed = any(
+                (op[1] < b_e and op[2] > b_s) or (op[1] == op[2] and b_s <= op[1] <= b_e)
+                for op in left_ops
+            )
+            right_changed = any(
+                (op[1] < b_e and op[2] > b_s) or (op[1] == op[2] and b_s <= op[1] <= b_e)
+                for op in right_ops
+            )
 
             if cur_left == cur_right:
                 merge_chunks.append(MergeConflictChunk(
@@ -622,25 +819,34 @@ class DiffEngine:
                     left_lines=cur_left,
                     right_lines=cur_right,
                     resolved_lines=cur_left,
-                    resolution_state="auto"
+                    resolution_state="auto",
+                    base_start=b_s, base_end=b_e,
+                    left_start=l_s, left_end=l_e,
+                    right_start=r_s, right_end=r_e
                 ))
-            elif cur_left == cur_base and cur_right != cur_base:
+            elif not left_changed and right_changed:
                 merge_chunks.append(MergeConflictChunk(
                     is_conflict=False,
                     base_lines=cur_base,
                     left_lines=cur_left,
                     right_lines=cur_right,
                     resolved_lines=cur_right,
-                    resolution_state="auto"
+                    resolution_state="auto",
+                    base_start=b_s, base_end=b_e,
+                    left_start=l_s, left_end=l_e,
+                    right_start=r_s, right_end=r_e
                 ))
-            elif cur_right == cur_base and cur_left != cur_base:
+            elif not right_changed and left_changed:
                 merge_chunks.append(MergeConflictChunk(
                     is_conflict=False,
                     base_lines=cur_base,
                     left_lines=cur_left,
                     right_lines=cur_right,
                     resolved_lines=cur_left,
-                    resolution_state="auto"
+                    resolution_state="auto",
+                    base_start=b_s, base_end=b_e,
+                    left_start=l_s, left_end=l_e,
+                    right_start=r_s, right_end=r_e
                 ))
             else:
                 merge_chunks.append(MergeConflictChunk(
@@ -649,30 +855,31 @@ class DiffEngine:
                     left_lines=cur_left,
                     right_lines=cur_right,
                     resolved_lines=[],
-                    resolution_state="unresolved"
+                    resolution_state="unresolved",
+                    base_start=b_s, base_end=b_e,
+                    left_start=l_s, left_end=l_e,
+                    right_start=r_s, right_end=r_e
                 ))
 
-            b_pos = b_end
+            b_cursor = b_e
+            l_cursor = l_e
+            r_cursor = r_e
 
-        l_tail = [op for op in left_ops if op[1] >= len(base_lines) and op[0] == 'insert']
-        r_tail = [op for op in right_ops if op[1] >= len(base_lines) and op[0] == 'insert']
-        for op in l_tail:
+        if b_cursor < len(base_lines):
+            eq_base = base_lines[b_cursor:]
             merge_chunks.append(MergeConflictChunk(
                 is_conflict=False,
-                base_lines=[],
-                left_lines=left_lines[op[3]:op[4]],
-                right_lines=[],
-                resolved_lines=left_lines[op[3]:op[4]],
-                resolution_state="auto"
-            ))
-        for op in r_tail:
-            merge_chunks.append(MergeConflictChunk(
-                is_conflict=False,
-                base_lines=[],
-                left_lines=[],
-                right_lines=right_lines[op[3]:op[4]],
-                resolved_lines=right_lines[op[3]:op[4]],
-                resolution_state="auto"
+                base_lines=eq_base,
+                left_lines=eq_base,
+                right_lines=eq_base,
+                resolved_lines=eq_base,
+                resolution_state="auto",
+                base_start=b_cursor,
+                base_end=len(base_lines),
+                left_start=l_cursor,
+                left_end=l_cursor + len(eq_base),
+                right_start=r_cursor,
+                right_end=r_cursor + len(eq_base)
             ))
 
         return merge_chunks

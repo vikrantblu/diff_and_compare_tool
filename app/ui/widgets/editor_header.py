@@ -1,14 +1,17 @@
 """
-Modern Pane Header Widget (Light Theme)
-Displays file paths, encoding, line counts, save action, and per-pane diff badges.
+Modern Pane Header Widget (White / Light Theme)
+Displays file paths, real encoding & line-ending badges, save action, drag-and-drop, and per-pane diff badges.
 """
 
+import os
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QLabel, QPushButton, QFileDialog
+    QWidget, QHBoxLayout, QLabel, QPushButton, QFileDialog, QMessageBox
 )
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
+
 from app.ui.styles.icons import get_line_icon
-import os
+from app.core.file_io import read_text_file
 
 
 class EditorHeader(QWidget):
@@ -21,6 +24,10 @@ class EditorHeader(QWidget):
         super().__init__(parent)
         self.current_file_path = default_path
         self.is_dirty = False
+        self.encoding = "UTF-8"
+        self.eol = "LF"
+        self._display_title = None
+        self.setAcceptDrops(True)
 
         self.setObjectName("EditorHeader")
         self.setFixedHeight(40)
@@ -98,11 +105,24 @@ class EditorHeader(QWidget):
     def set_file_info(self, file_path: str, dirty: bool = False, display_title: str = None):
         self.current_file_path = file_path
         self.is_dirty = dirty
-        name = display_title if display_title else (os.path.basename(file_path) if file_path else "Untitled")
+        if display_title is not None:
+            self._display_title = display_title
+        elif not dirty:
+            self._display_title = None
+        name = display_title if display_title else (self._display_title or (os.path.basename(file_path) if file_path else "Untitled"))
         if dirty:
             name += " *"
         self.lbl_path.setText(name)
         self.lbl_path.setToolTip(display_title if display_title else file_path)
+
+    def set_dirty(self, dirty: bool):
+        if self.is_dirty != dirty:
+            self.set_file_info(self.current_file_path, dirty=dirty, display_title=self._display_title)
+
+    def set_encoding_info(self, encoding: str, eol: str):
+        self.encoding = encoding or "UTF-8"
+        self.eol = eol or "LF"
+        self.lbl_meta.setText(f"{self.encoding} | {self.eol}")
 
     def set_diff_stats(self, added: int, deleted: int, modified: int):
         parts = []
@@ -120,15 +140,29 @@ class EditorHeader(QWidget):
             self.lbl_badge.setText("")
             self.lbl_badge.setVisible(False)
 
+    def load_local_file(self, file_path: str):
+        try:
+            content, enc, eol = read_text_file(file_path)
+            self.set_file_info(file_path, dirty=False)
+            self.set_encoding_info(enc, eol)
+            self.fileOpened.emit(file_path, content)
+        except Exception as e:
+            QMessageBox.warning(self, "Error Opening File", f"Could not open file:\n{file_path}\n\n{e}")
+
     def _open_file_dialog(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Open File for Comparison", "", "All Files (*.*);;Python Files (*.py);;Text Files (*.txt)"
         )
         if file_path:
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-                    content = f.read()
-                self.set_file_info(file_path, dirty=False)
-                self.fileOpened.emit(file_path, content)
-            except Exception as e:
-                print(f"Error opening file: {e}")
+            self.load_local_file(file_path)
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData().hasUrls():
+            urls = [u.toLocalFile() for u in event.mimeData().urls() if u.isLocalFile()]
+            if urls and os.path.isfile(urls[0]):
+                event.acceptProposedAction()
+
+    def dropEvent(self, event: QDropEvent):
+        urls = [u.toLocalFile() for u in event.mimeData().urls() if u.isLocalFile()]
+        if urls and os.path.isfile(urls[0]):
+            self.load_local_file(urls[0])

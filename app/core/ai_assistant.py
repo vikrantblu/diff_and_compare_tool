@@ -6,6 +6,7 @@ Features:
 - Prompt Engineering tailored for code review and refactoring.
 """
 
+import os
 import json
 import urllib.request
 import urllib.error
@@ -45,24 +46,29 @@ class AIAssistant:
         sample_diffs = []
 
         for c in chunks:
+            l_s = c.raw_left_start if c.raw_left_start is not None else c.left_start
+            l_e = c.raw_left_end if c.raw_left_end is not None else c.left_end
+            r_s = c.raw_right_start if c.raw_right_start is not None else c.right_start
+            r_e = c.raw_right_end if c.raw_right_end is not None else c.right_end
+
             if c.is_moved:
                 moved_blocks += 1
             elif c.tag == "insert":
-                count = c.right_end - c.right_start
+                count = r_e - r_s
                 added_lines += count
                 if len(sample_diffs) < 8:
-                    lines = right_raw[c.right_start:min(c.right_end, c.right_start + 3)]
-                    sample_diffs.append(f"+ " + "\n+ ".join(lines))
+                    lines = right_raw[r_s:min(r_e, r_s + 3)]
+                    sample_diffs.append("+ " + "\n+ ".join(lines))
             elif c.tag == "delete":
-                count = c.left_end - c.left_start
+                count = l_e - l_s
                 deleted_lines += count
                 if len(sample_diffs) < 8:
-                    lines = left_raw[c.left_start:min(c.left_end, c.left_start + 3)]
-                    sample_diffs.append(f"- " + "\n- ".join(lines))
+                    lines = left_raw[l_s:min(l_e, l_s + 3)]
+                    sample_diffs.append("- " + "\n- ".join(lines))
             elif c.tag == "replace":
-                modified_lines += max(c.left_end - c.left_start, c.right_end - c.right_start)
+                modified_lines += max(l_e - l_s, r_e - r_s)
                 if len(sample_diffs) < 8:
-                    sample_diffs.append(f"~ Changed block at line {c.left_start+1} -> {c.right_start+1}")
+                    sample_diffs.append(f"~ Changed block at line {l_s + 1} -> {r_s + 1}")
 
         raw_prompt = (
             f"You are a Principal Software Engineer. Provide a concise, professional Pull Request Summary "
@@ -83,7 +89,7 @@ class AIAssistant:
             cats_str = ", ".join(scrub_cats)
             privacy_footer = f"\n\n> 🛡️ **Privacy Shield**: {scrub_count} sensitive item(s) redacted ({cats_str}) prior to AI ingestion."
 
-        llm_response = cls._call_llm(clean_prompt, endpoint, model, api_key)
+        llm_response = cls._call_llm(clean_prompt, endpoint, model, api_key) if endpoint else None
         if llm_response:
             return llm_response + privacy_footer
 
@@ -121,7 +127,7 @@ class AIAssistant:
             f"Output JSON with keys 'resolved_code' (string) and 'explanation' (string)."
         )
 
-        llm_raw = cls._call_llm(prompt, endpoint, model, api_key)
+        llm_raw = cls._call_llm(prompt, endpoint, model, api_key) if endpoint else None
         if llm_raw:
             try:
                 # Attempt to extract json block
@@ -143,6 +149,21 @@ class AIAssistant:
         # Offline Intelligent Heuristic Reconciliation
         return cls._resolve_conflict_heuristic(conflict)
 
+    @staticmethod
+    def build_llm_payload(prompt: str, endpoint: str, model: str) -> Dict[str, Any]:
+        """Constructs the request body matching either OpenAI Chat Completions or Ollama Generate APIs."""
+        if "chat/completions" in endpoint:
+            return {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2,
+            }
+        return {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+        }
+
     @classmethod
     def _call_llm(
         cls,
@@ -151,18 +172,19 @@ class AIAssistant:
         model: Optional[str] = None,
         api_key: Optional[str] = None
     ) -> Optional[str]:
-        target_endpoint = endpoint or cls.DEFAULT_OLLAMA_ENDPOINT
+        if not endpoint:
+            return None
+        target_endpoint = endpoint
         target_model = model or cls.DEFAULT_MODEL
 
         if not (target_endpoint.startswith("http://") or target_endpoint.startswith("https://")):
             return None
 
+        resolved_key = api_key or os.environ.get("OPENAI_API_KEY")
+
         try:
-            req_data = json.dumps({
-                "model": target_model,
-                "prompt": prompt,
-                "stream": False
-            }).encode("utf-8")
+            payload = cls.build_llm_payload(prompt, target_endpoint, target_model)
+            req_data = json.dumps(payload).encode("utf-8")
 
             req = urllib.request.Request(
                 target_endpoint,
@@ -170,10 +192,10 @@ class AIAssistant:
                 headers={"Content-Type": "application/json"},
                 method="POST"
             )
-            if api_key:
-                req.add_header("Authorization", f"Bearer {api_key}")
+            if resolved_key:
+                req.add_header("Authorization", f"Bearer {resolved_key}")
 
-            with urllib.request.urlopen(req, timeout=3.5) as resp:  # nosec B310
+            with urllib.request.urlopen(req, timeout=30.0) as resp:  # nosec B310
                 data = json.loads(resp.read().decode("utf-8"))
                 if "response" in data:
                     return data["response"].strip()

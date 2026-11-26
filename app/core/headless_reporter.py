@@ -1,10 +1,11 @@
 """
-Headless Automated Comparison & CI/CD HTML Reporting Engine
+Headless Automated Comparison & CI/CD HTML/JSON Reporting Engine
 Enables automated non-GUI pipeline comparisons:
 diff_and_compare --folder-diff dir_a/ dir_b/ --report-html report.html --exit-code
+diff_and_compare --contract-diff old.yaml new.yaml --report-json report.json --exit-code
 Exit codes:
-0 = Identical
-1 = Content / binary mismatch
+0 = Identical / Non-breaking
+1 = Content / binary mismatch or breaking contract change
 2 = Error (missing path, permission, etc.)
 """
 
@@ -12,13 +13,16 @@ import os
 import sys
 import time
 import html
+import json
+from dataclasses import asdict
 from typing import Optional, List, Tuple
 from app.core.folder_compare_engine import FolderCompareEngine, FolderCompareItem
-from app.core.diff_engine import DiffEngine, DiffChunk
+from app.core.diff_engine import DiffEngine
+from app.core.contract_diff import ContractDiffEngine
 
 
 class HeadlessReporter:
-    """Executes headless comparisons and generates standalone HTML reports."""
+    """Executes headless comparisons and generates standalone HTML/JSON reports."""
 
     @classmethod
     def run_folder_comparison(
@@ -48,13 +52,14 @@ class HeadlessReporter:
         except Exception as e:
             return 2, f"Error during folder comparison: {e}"
 
-        # Flatten items
-        flat_items = []
+        flat_items: List[FolderCompareItem] = []
+
         def flatten(lst):
             for it in lst:
                 flat_items.append(it)
                 if it.children:
                     flatten(it.children)
+
         flatten(items)
 
         total_files = 0
@@ -241,18 +246,38 @@ class HeadlessReporter:
         status_banner_color = "#10b981" if exit_code == 0 else "#ef4444"
         status_text = "MATCH — IDENTICAL" if exit_code == 0 else f"MISMATCH — {diff_count} DIFF CHUNKS"
 
-        patch_escaped = html.escape(patch)
+        diff_lines_html = []
+        for line in patch.splitlines():
+            esc = html.escape(line)
+            if line.startswith("+++") or line.startswith("---"):
+                diff_lines_html.append(f'<div class="diff-meta">{esc}</div>')
+            elif line.startswith("@@"):
+                diff_lines_html.append(f'<div class="diff-hunk">{esc}</div>')
+            elif line.startswith("+"):
+                diff_lines_html.append(f'<div class="diff-add">{esc}</div>')
+            elif line.startswith("-"):
+                diff_lines_html.append(f'<div class="diff-del">{esc}</div>')
+            else:
+                diff_lines_html.append(f'<div class="diff-ctx">{esc}</div>')
+
+        body_html = "\n".join(diff_lines_html) if diff_lines_html else '<div class="diff-ctx">(Files are identical)</div>'
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>File Diff Report — diff_and_compare</title>
 <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 24px; }}
-    .container {{ max-width: 1000px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1; overflow: hidden; }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 24px; }}
+    .container {{ max-width: 1100px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1; overflow: hidden; }}
     .header {{ padding: 20px; border-bottom: 1px solid #e2e8f0; }}
     .banner {{ display: inline-block; padding: 4px 12px; border-radius: 9999px; color: #ffffff; font-weight: 700; font-size: 12px; background-color: {status_banner_color}; }}
-    pre {{ background: #0f172a; color: #f8fafc; padding: 16px; margin: 0; font-family: Consolas, monospace; font-size: 13px; overflow-x: auto; line-height: 1.5; }}
+    .diff-box {{ background: #ffffff; font-family: Consolas, monospace; font-size: 13px; overflow-x: auto; line-height: 1.5; padding: 8px 0; }}
+    .diff-box div {{ padding: 1px 16px; white-space: pre; }}
+    .diff-meta {{ background: #f1f5f9; color: #334155; font-weight: 700; }}
+    .diff-hunk {{ background: #eff6ff; color: #0969da; font-weight: 600; }}
+    .diff-add {{ background: #dafbe1; color: #116329; }}
+    .diff-del {{ background: #ffebe9; color: #a40e26; }}
+    .diff-ctx {{ color: #334155; }}
 </style>
 </head>
 <body>
@@ -262,9 +287,91 @@ class HeadlessReporter:
         <p><strong>A:</strong> {html.escape(file_a)}<br><strong>B:</strong> {html.escape(file_b)}</p>
         <span class="banner">{status_text}</span>
     </div>
-    <pre>{patch_escaped}</pre>
+    <div class="diff-box">{body_html}</div>
 </div>
 </body>
 </html>"""
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+    @classmethod
+    def run_contract_comparison(
+        cls,
+        file_a: str,
+        file_b: str,
+        report_html_path: Optional[str] = None,
+        report_json_path: Optional[str] = None
+    ) -> Tuple[int, str]:
+        """Runs headless API contract comparison (OpenAPI, GraphQL, Protobuf). Returns exit_code 1 if breaking changes detected."""
+        if not os.path.exists(file_a) or not os.path.exists(file_b):
+            return 2, "Error: One or both contract files do not exist."
+
+        try:
+            with open(file_a, "r", encoding="utf-8", errors="replace") as f:
+                t_a = f.read()
+            with open(file_b, "r", encoding="utf-8", errors="replace") as f:
+                t_b = f.read()
+
+            report = ContractDiffEngine.diff_contracts(t_a, t_b, file_a, file_b)
+            exit_code = 1 if report.has_breaking_changes else 0
+
+            if report_json_path:
+                payload = {
+                    "contract_type": report.contract_type,
+                    "has_breaking_changes": report.has_breaking_changes,
+                    "breaking_count": report.breaking_count,
+                    "warning_count": report.warning_count,
+                    "additive_count": report.additive_count,
+                    "changes": [asdict(c) for c in report.changes],
+                }
+                with open(report_json_path, "w", encoding="utf-8") as jf:
+                    json.dump(payload, jf, indent=2)
+
+            if report_html_path:
+                cls._generate_contract_html_report(file_a, file_b, report, report_html_path, exit_code)
+
+            return exit_code, (
+                f"Contract Audit ({report.contract_type}): "
+                f"Breaking={report.breaking_count}, Warnings={report.warning_count}, Additive={report.additive_count}. "
+                f"Status: {'BREAKING' if report.has_breaking_changes else 'COMPATIBLE'}"
+            )
+        except Exception as e:
+            return 2, f"Error during contract comparison: {e}"
+
+    @classmethod
+    def _generate_contract_html_report(cls, file_a: str, file_b: str, report, output_file: str, exit_code: int):
+        banner_color = "#ef4444" if report.has_breaking_changes else "#10b981"
+        banner_text = f"BREAKING CHANGES ({report.breaking_count})" if report.has_breaking_changes else "BACKWARD COMPATIBLE"
+        rows = []
+        for c in report.changes:
+            cls_name = "badge-diff" if c.category == "BREAKING" else ("badge-warn" if c.category == "WARNING" else "badge-add")
+            rows.append(
+                f"<tr><td><span class='badge {cls_name}'>{html.escape(c.category)}</span></td>"
+                f"<td>{html.escape(c.entity_path)}</td>"
+                f"<td>{html.escape(c.change_type)}</td>"
+                f"<td>{html.escape(c.description)}</td></tr>"
+            )
+        html_content = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>API Contract Audit — diff_and_compare</title>
+<style>
+    body {{ font-family: "Segoe UI", sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 24px; }}
+    .container {{ max-width: 1100px; margin: 0 auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }}
+    .header {{ padding: 20px; border-bottom: 1px solid #e2e8f0; }}
+    .banner {{ display: inline-block; padding: 4px 12px; border-radius: 9999px; color: #fff; font-weight: 700; font-size: 12px; background: {banner_color}; }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+    th, td {{ padding: 10px 14px; border-bottom: 1px solid #f1f5f9; text-align: left; }}
+    th {{ background: #f1f5f9; color: #334155; }}
+    .badge {{ padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }}
+    .badge-diff {{ background: #ffe4e6; color: #cf222e; }}
+    .badge-warn {{ background: #fff8c5; color: #9a6700; }}
+    .badge-add {{ background: #dafbe1; color: #1a7f37; }}
+</style></head>
+<body><div class="container"><div class="header">
+<h2>API Contract Audit ({html.escape(report.contract_type)})</h2>
+<p><strong>Old:</strong> {html.escape(file_a)}<br><strong>New:</strong> {html.escape(file_b)}</p>
+<span class="banner">{banner_text}</span>
+</div><table><thead><tr><th>Severity</th><th>Entity</th><th>Change Type</th><th>Description</th></tr></thead>
+<tbody>{"".join(rows) if rows else "<tr><td colspan='4'>No contract changes detected.</td></tr>"}</tbody></table>
+</div></body></html>"""
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(html_content)

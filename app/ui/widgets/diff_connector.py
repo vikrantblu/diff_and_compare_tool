@@ -1,10 +1,10 @@
 """
-Interactive Diff Connector Widget (Light Theme)
-Renders clean horizontal alignment bridges for aligned diff blocks
-with interactive chunk-transfer action buttons (> and <).
+Interactive Diff Connector Widget (White / Light Theme)
+Renders clean horizontal alignment bridges for aligned diff blocks (including purple moved blocks)
+with interactive chunk-transfer action buttons (> and <) and active hunk highlighting.
 """
 
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget, QToolTip, QMenu
 from PySide6.QtCore import Qt, QRectF, Signal
 from PySide6.QtGui import QPainter, QColor, QPen, QPainterPath
 from typing import List
@@ -28,6 +28,7 @@ class DiffConnectorWidget(QWidget):
         self.setMouseTracking(True)
 
         self.chunks: List[DiffChunk] = []
+        self.active_chunk_idx = -1
         self.hovered_chunk_idx = -1
         self.hovered_button = None
 
@@ -35,18 +36,26 @@ class DiffConnectorWidget(QWidget):
         self.COLOR_REPLACE = QColor(9, 105, 218, 38)   # Modern Blue
         self.COLOR_DELETE = QColor(209, 36, 47, 38)    # Soft Red
         self.COLOR_INSERT = QColor(46, 160, 67, 38)    # Soft Green
+        self.COLOR_MOVED = QColor(130, 80, 223, 38)    # Soft Purple
 
     def set_chunks(self, chunks: List[DiffChunk]):
         self.chunks = chunks
         self.update()
 
+    def set_active_chunk(self, chunk_idx: int):
+        self.active_chunk_idx = chunk_idx
+        self.update()
+
     def _get_line_y(self, editor, line_number: int) -> float:
+        win_start = editor.get_window_start() if hasattr(editor, "get_window_start") else 0
+        local_line = line_number - win_start
         doc = editor.document()
-        block = doc.findBlockByNumber(line_number)
-        if block.isValid():
-            return editor.blockBoundingGeometry(block).translated(editor.contentOffset()).top()
+        if 0 <= local_line < editor.blockCount():
+            block = doc.findBlockByNumber(local_line)
+            if block.isValid():
+                return editor.blockBoundingGeometry(block).translated(editor.contentOffset()).top()
         fm = editor.fontMetrics()
-        return (line_number * fm.height()) + editor.contentOffset().y()
+        return (local_line * fm.height()) + editor.contentOffset().y()
 
     def _get_line_height(self, editor) -> float:
         return float(editor.fontMetrics().height())
@@ -55,7 +64,6 @@ class DiffConnectorWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # Crisp light background & border
         painter.fillRect(self.rect(), QColor("#ffffff"))
         painter.setPen(QColor("#d0d7de"))
         painter.drawLine(0, 0, 0, self.height())
@@ -80,13 +88,16 @@ class DiffConnectorWidget(QWidget):
             elif chunk.tag == 'insert':
                 fill_color = self.COLOR_INSERT
                 border_color = QColor("#2da44e")
+            elif chunk.tag == 'moved':
+                fill_color = self.COLOR_MOVED
+                border_color = QColor("#8250df")
             else:
                 continue
 
             y_l1 = self._get_line_y(self.left_editor, chunk.left_start)
-            y_l2 = self._get_line_y(self.left_editor, chunk.left_end - 1) + lh
+            y_l2 = self._get_line_y(self.left_editor, max(chunk.left_start, chunk.left_end - 1)) + lh
             y_r1 = self._get_line_y(self.right_editor, chunk.right_start)
-            y_r2 = self._get_line_y(self.right_editor, chunk.right_end - 1) + lh
+            y_r2 = self._get_line_y(self.right_editor, max(chunk.right_start, chunk.right_end - 1)) + lh
 
             if max(y_l2, y_r2) < 0 or min(y_l1, y_r1) > self.height():
                 continue
@@ -102,8 +113,8 @@ class DiffConnectorWidget(QWidget):
             painter.setPen(Qt.NoPen)
             painter.drawPath(path)
 
-            pen = QPen(border_color, 1.0)
-            painter.setPen(pen)
+            pen_width = 2.2 if idx == self.active_chunk_idx else 1.0
+            painter.setPen(QPen(border_color, pen_width))
             painter.setBrush(Qt.NoBrush)
 
             top_edge = QPainterPath()
@@ -130,14 +141,14 @@ class DiffConnectorWidget(QWidget):
         is_hover_ltr = (self.hovered_chunk_idx == idx and self.hovered_button == 'ltr')
         is_hover_rtl = (self.hovered_chunk_idx == idx and self.hovered_button == 'rtl')
 
-        if tag in ('replace', 'delete'):
+        if tag in ('replace', 'delete', 'moved'):
             painter.fillRect(r_ltr, QColor("#0969da") if is_hover_ltr else QColor("#ffffff"))
             painter.setPen(QColor("#0969da") if is_hover_ltr else QColor("#d0d7de"))
             painter.drawRect(r_ltr)
             painter.setPen(QColor("#ffffff") if is_hover_ltr else QColor("#57606a"))
             painter.drawText(r_ltr, Qt.AlignCenter, ">")
 
-        if tag in ('replace', 'insert'):
+        if tag in ('replace', 'insert', 'moved'):
             painter.fillRect(r_rtl, QColor("#0969da") if is_hover_rtl else QColor("#ffffff"))
             painter.setPen(QColor("#0969da") if is_hover_rtl else QColor("#d0d7de"))
             painter.drawRect(r_rtl)
@@ -150,6 +161,7 @@ class DiffConnectorWidget(QWidget):
 
         self.hovered_chunk_idx = -1
         self.hovered_button = None
+        hover_tip = None
 
         cx = self.width() / 2.0
         btn_w, btn_h = 14, 14
@@ -165,14 +177,25 @@ class DiffConnectorWidget(QWidget):
             r_ltr = QRectF(cx - btn_w - 1, mid_y - btn_h / 2, btn_w, btn_h)
             r_rtl = QRectF(cx + 1, mid_y - btn_h / 2, btn_w, btn_h)
 
-            if r_ltr.contains(pos) and chunk.tag in ('replace', 'delete'):
+            if r_ltr.contains(pos) and chunk.tag in ('replace', 'delete', 'moved'):
                 self.hovered_chunk_idx = idx
                 self.hovered_button = 'ltr'
+                hover_tip = "Copy Left block to Right"
                 break
-            elif r_rtl.contains(pos) and chunk.tag in ('replace', 'insert'):
+            elif r_rtl.contains(pos) and chunk.tag in ('replace', 'insert', 'moved'):
                 self.hovered_chunk_idx = idx
                 self.hovered_button = 'rtl'
+                hover_tip = "Copy Right block to Left"
                 break
+            elif chunk.tag == 'moved' and abs(pos.y() - mid_y) <= 18:
+                hover_tip = chunk.semantic_match_info or (
+                    f"Moved block (linked line {chunk.moved_to_line})" if chunk.moved_to_line else "Moved block"
+                )
+
+        if hover_tip:
+            QToolTip.showText(event.globalPosition().toPoint(), hover_tip, self)
+        else:
+            QToolTip.hideText()
 
         if old_hover != (self.hovered_chunk_idx, self.hovered_button):
             self.setCursor(Qt.PointingHandCursor if self.hovered_button else Qt.ArrowCursor)
@@ -194,9 +217,9 @@ class DiffConnectorWidget(QWidget):
             if chunk.tag == 'equal':
                 continue
             y_l1 = self._get_line_y(self.left_editor, chunk.left_start)
-            y_l2 = self._get_line_y(self.left_editor, chunk.left_end - 1) + lh
+            y_l2 = self._get_line_y(self.left_editor, max(chunk.left_start, chunk.left_end - 1)) + lh
             y_r1 = self._get_line_y(self.right_editor, chunk.right_start)
-            y_r2 = self._get_line_y(self.right_editor, chunk.right_end - 1) + lh
+            y_r2 = self._get_line_y(self.right_editor, max(chunk.right_start, chunk.right_end - 1)) + lh
             top_y = min(y_l1, y_r1)
             bot_y = max(y_l2, y_r2)
 
@@ -207,31 +230,13 @@ class DiffConnectorWidget(QWidget):
         if target_idx == -1:
             return
 
-        from PySide6.QtWidgets import QMenu
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background: #ffffff;
-                border: 1px solid #cbd5e1;
-                border-radius: 6px;
-                padding: 4px 0px;
-                font-size: 12px;
-            }
-            QMenu::item {
-                padding: 6px 20px 6px 12px;
-            }
-            QMenu::item:selected {
-                background: #f1f5f9;
-                color: #0969da;
-            }
-        """)
-
-        act_stage = menu.addAction("➕  Stage Hunk to Git Index")
-        act_unstage = menu.addAction("↺  Unstage Hunk from Index")
-        act_discard = menu.addAction("🗑  Discard Hunk (Revert Working Changes)")
+        act_stage = menu.addAction("Stage Hunk to Git Index")
+        act_unstage = menu.addAction("Unstage Hunk from Index")
+        act_discard = menu.addAction("Discard Hunk (Revert Working Changes)")
         menu.addSeparator()
-        act_ltr = menu.addAction("▶  Copy Left to Right (>)")
-        act_rtl = menu.addAction("◀  Copy Right to Left (<)")
+        act_ltr = menu.addAction("Copy Left to Right (>)")
+        act_rtl = menu.addAction("Copy Right to Left (<)")
 
         chosen = menu.exec(event.globalPos().toPoint())
         if chosen == act_stage:

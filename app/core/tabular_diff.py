@@ -44,10 +44,26 @@ class TabularDiffResult:
     modified_count: int
     equal_count: int
     key_column: Optional[str]
+    duplicate_keys_left: int = 0
+    duplicate_keys_right: int = 0
+    truncated: bool = False
 
 
 class TabularDiffEngine:
     """Core evaluation engine for tabular CSV, TSV, and spreadsheet data."""
+
+    MAX_STREAMED_ROWS = 50000
+
+    @staticmethod
+    def list_excel_sheets(filepath: str) -> List[str]:
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+            names = list(wb.sheetnames)
+            wb.close()
+            return names
+        except Exception:
+            return []
 
     @classmethod
     def load_table(cls, path_or_content: str, delimiter: str = "auto", table_name: Optional[str] = None) -> Tuple[List[str], List[List[str]]]:
@@ -55,7 +71,7 @@ class TabularDiffEngine:
         if os.path.exists(path_or_content):
             ext = os.path.splitext(path_or_content)[1].lower()
             if ext in (".xlsx", ".xlsm", ".xltx"):
-                return cls._load_excel(path_or_content)
+                return cls._load_excel(path_or_content, table_name)
             elif ext == ".parquet":
                 return cls._load_parquet(path_or_content)
             elif ext in (".db", ".sqlite", ".sqlite3"):
@@ -85,18 +101,21 @@ class TabularDiffEngine:
         return headers, rows
 
     @staticmethod
-    def _load_excel(filepath: str) -> Tuple[List[str], List[List[str]]]:
+    def _load_excel(filepath: str, sheet_name: Optional[str] = None) -> Tuple[List[str], List[List[str]]]:
         try:
             import openpyxl
             wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
-            sheet = wb.active
-            rows = []
-            for row in sheet.iter_rows(values_only=True):
-                str_row = ["" if v is None else str(v) for v in row]
-                rows.append(str_row)
-            if not rows:
-                return [], []
-            return rows[0], rows[1:]
+            try:
+                sheet = wb[sheet_name] if (sheet_name and sheet_name in wb.sheetnames) else wb.active
+                rows = []
+                for row in sheet.iter_rows(values_only=True):
+                    str_row = ["" if v is None else str(v) for v in row]
+                    rows.append(str_row)
+                if not rows:
+                    return [], []
+                return rows[0], rows[1:]
+            finally:
+                wb.close()
         except Exception:
             return ["Column1"], [["Error loading Excel file"]]
 
@@ -204,44 +223,55 @@ class TabularDiffEngine:
         key_column: Optional[str] = None,
         delimiter: str = "auto",
         ignore_case: bool = False,
-        float_tolerance: float = 0.0
+        float_tolerance: float = 0.0,
+        table_name_left: Optional[str] = None,
+        table_name_right: Optional[str] = None
     ) -> TabularDiffResult:
         """
         Performs tabular comparison with optional primary key alignment and numerical float tolerance.
         """
-        l_headers, l_rows = cls.load_table(left_source, delimiter)
-        r_headers, r_rows = cls.load_table(right_source, delimiter)
+        l_headers, l_rows = cls.load_table(left_source, delimiter, table_name=table_name_left)
+        r_headers, r_rows = cls.load_table(right_source, delimiter, table_name=table_name_right or table_name_left)
+        return cls.compare_parsed_tables(
+            l_headers, l_rows, r_headers, r_rows,
+            key_column=key_column, ignore_case=ignore_case, float_tolerance=float_tolerance
+        )
 
-        # Combined headers
-        all_headers = list(l_headers)
-        for h in r_headers:
-            if h not in all_headers:
-                all_headers.append(h)
+    @classmethod
+    def compare_parsed_tables(
+        cls,
+        l_headers: List[str],
+        l_rows: List[List[str]],
+        r_headers: List[str],
+        r_rows: List[List[str]],
+        key_column: Optional[str] = None,
+        ignore_case: bool = False,
+        float_tolerance: float = 0.0
+    ) -> TabularDiffResult:
+        """Compares already-loaded table headers and rows in memory."""
+        all_headers = list(dict.fromkeys(list(l_headers) + list(r_headers)))
         if not all_headers:
             all_headers = ["Col 1"]
 
-        # Find key column index
-        l_key_idx = -1
-        r_key_idx = -1
-        if key_column:
-            if key_column in l_headers:
-                l_key_idx = l_headers.index(key_column)
-            if key_column in r_headers:
-                r_key_idx = r_headers.index(key_column)
+        l_key_idx = l_headers.index(key_column) if (key_column and key_column in l_headers) else -1
+        r_key_idx = r_headers.index(key_column) if (key_column and key_column in r_headers) else -1
 
-        # If key column valid on both sides, do Keyed Alignment
+        truncated = len(l_rows) >= cls.MAX_STREAMED_ROWS or len(r_rows) >= cls.MAX_STREAMED_ROWS
+
         if l_key_idx != -1 and r_key_idx != -1:
-            return cls._compare_keyed(
+            res = cls._compare_keyed(
                 l_headers, l_rows, l_key_idx,
                 r_headers, r_rows, r_key_idx,
                 all_headers, key_column, ignore_case, float_tolerance
             )
         else:
-            return cls._compare_sequential(
+            res = cls._compare_sequential(
                 l_headers, l_rows,
                 r_headers, r_rows,
                 all_headers, ignore_case, float_tolerance
             )
+        res.truncated = truncated
+        return res
 
     @classmethod
     def _compare_keyed(
@@ -258,27 +288,34 @@ class TabularDiffEngine:
         float_tolerance: float = 0.0
     ) -> TabularDiffResult:
         l_map: Dict[str, Tuple[int, List[str]]] = {}
+        dup_left = 0
         for idx, row in enumerate(l_rows):
             k = row[l_key_idx] if l_key_idx < len(row) else f"_row_{idx}"
             if ignore_case:
                 k = k.lower()
+            if k in l_map:
+                dup_left += 1
             l_map[k] = (idx, row)
 
         r_map: Dict[str, Tuple[int, List[str]]] = {}
+        dup_right = 0
         for idx, row in enumerate(r_rows):
             k = row[r_key_idx] if r_key_idx < len(row) else f"_row_{idx}"
             if ignore_case:
                 k = k.lower()
+            if k in r_map:
+                dup_right += 1
             r_map[k] = (idx, row)
 
-        # Union of keys preserving encounter order
-        all_keys = list(l_map.keys())
-        for k in r_map.keys():
-            if k not in all_keys:
-                all_keys.append(k)
+        # O(N) ordered union of keys preserving encounter order
+        all_keys = list(dict.fromkeys(list(l_map.keys()) + list(r_map.keys())))
+
+        l_col_map = cls._build_header_index_map(l_headers, all_headers)
+        r_col_map = cls._build_header_index_map(r_headers, all_headers)
 
         diff_rows: List[RowDiff] = []
         counts = {"added": 0, "deleted": 0, "modified": 0, "equal": 0}
+        empty_row = [""] * len(all_headers)
 
         for k in all_keys:
             in_left = k in l_map
@@ -286,36 +323,34 @@ class TabularDiffEngine:
 
             if in_left and not in_right:
                 l_idx, l_r = l_map[k]
-                l_norm = cls._align_row_to_headers(l_r, l_headers, all_headers)
+                l_norm = cls._align_row_with_map(l_r, l_col_map)
                 diff_rows.append(RowDiff(
                     row_key=k, status="deleted",
                     left_row_idx=l_idx, right_row_idx=None,
-                    left_cells=l_norm, right_cells=[""] * len(all_headers)
+                    left_cells=l_norm, right_cells=list(empty_row)
                 ))
                 counts["deleted"] += 1
 
             elif in_right and not in_left:
                 r_idx, r_r = r_map[k]
-                r_norm = cls._align_row_to_headers(r_r, r_headers, all_headers)
+                r_norm = cls._align_row_with_map(r_r, r_col_map)
                 diff_rows.append(RowDiff(
                     row_key=k, status="added",
                     left_row_idx=None, right_row_idx=r_idx,
-                    left_cells=[""] * len(all_headers), right_cells=r_norm
+                    left_cells=list(empty_row), right_cells=r_norm
                 ))
                 counts["added"] += 1
 
             else:
                 l_idx, l_r = l_map[k]
                 r_idx, r_r = r_map[k]
-                l_norm = cls._align_row_to_headers(l_r, l_headers, all_headers)
-                r_norm = cls._align_row_to_headers(r_r, r_headers, all_headers)
+                l_norm = cls._align_row_with_map(l_r, l_col_map)
+                r_norm = cls._align_row_with_map(r_r, r_col_map)
 
-                modified_cols = set()
-                for c_idx in range(len(all_headers)):
-                    v1 = l_norm[c_idx]
-                    v2 = r_norm[c_idx]
-                    if not cls._are_cells_equal(v1, v2, float_tolerance, ignore_case):
-                        modified_cols.add(c_idx)
+                modified_cols = {
+                    c_idx for c_idx in range(len(all_headers))
+                    if not cls._are_cells_equal(l_norm[c_idx], r_norm[c_idx], float_tolerance, ignore_case)
+                }
 
                 status = "modified" if modified_cols else "equal"
                 counts[status] += 1
@@ -334,7 +369,9 @@ class TabularDiffEngine:
             deleted_count=counts["deleted"],
             modified_count=counts["modified"],
             equal_count=counts["equal"],
-            key_column=key_column
+            key_column=key_column,
+            duplicate_keys_left=dup_left,
+            duplicate_keys_right=dup_right
         )
 
     @classmethod
@@ -349,6 +386,10 @@ class TabularDiffEngine:
         float_tolerance: float = 0.0
     ) -> TabularDiffResult:
         max_rows = max(len(l_rows), len(r_rows))
+        l_col_map = cls._build_header_index_map(l_headers, all_headers)
+        r_col_map = cls._build_header_index_map(r_headers, all_headers)
+        empty_row = [""] * len(all_headers)
+
         diff_rows: List[RowDiff] = []
         counts = {"added": 0, "deleted": 0, "modified": 0, "equal": 0}
 
@@ -358,29 +399,28 @@ class TabularDiffEngine:
 
             l_r = l_rows[idx] if in_left else []
             r_r = r_rows[idx] if in_right else []
-            l_norm = cls._align_row_to_headers(l_r, l_headers, all_headers)
-            r_norm = cls._align_row_to_headers(r_r, r_headers, all_headers)
+            l_norm = cls._align_row_with_map(l_r, l_col_map) if in_left else list(empty_row)
+            r_norm = cls._align_row_with_map(r_r, r_col_map) if in_right else list(empty_row)
 
             if in_left and not in_right:
                 diff_rows.append(RowDiff(
                     row_key=f"Row {idx+1}", status="deleted",
                     left_row_idx=idx, right_row_idx=None,
-                    left_cells=l_norm, right_cells=[""] * len(all_headers)
+                    left_cells=l_norm, right_cells=list(empty_row)
                 ))
                 counts["deleted"] += 1
             elif in_right and not in_left:
                 diff_rows.append(RowDiff(
                     row_key=f"Row {idx+1}", status="added",
                     left_row_idx=None, right_row_idx=idx,
-                    left_cells=[""] * len(all_headers), right_cells=r_norm
+                    left_cells=list(empty_row), right_cells=r_norm
                 ))
                 counts["added"] += 1
             else:
-                mod_cols = set()
-                for c_idx in range(len(all_headers)):
-                    v1, v2 = l_norm[c_idx], r_norm[c_idx]
-                    if not cls._are_cells_equal(v1, v2, float_tolerance, ignore_case):
-                        mod_cols.add(c_idx)
+                mod_cols = {
+                    c_idx for c_idx in range(len(all_headers))
+                    if not cls._are_cells_equal(l_norm[c_idx], r_norm[c_idx], float_tolerance, ignore_case)
+                }
 
                 st = "modified" if mod_cols else "equal"
                 counts[st] += 1
@@ -403,13 +443,16 @@ class TabularDiffEngine:
         )
 
     @staticmethod
+    def _build_header_index_map(row_headers: List[str], all_headers: List[str]) -> List[int]:
+        pos = {h: i for i, h in enumerate(row_headers)}
+        return [pos.get(h, -1) for h in all_headers]
+
+    @staticmethod
+    def _align_row_with_map(row: List[str], col_map: List[int]) -> List[str]:
+        row_len = len(row)
+        return [row[idx] if 0 <= idx < row_len else "" for idx in col_map]
+
+    @staticmethod
     def _align_row_to_headers(row: List[str], row_headers: List[str], all_headers: List[str]) -> List[str]:
-        aligned = []
-        for h in all_headers:
-            if h in row_headers:
-                h_idx = row_headers.index(h)
-                val = row[h_idx] if h_idx < len(row) else ""
-            else:
-                val = ""
-            aligned.append(val)
-        return aligned
+        col_map = TabularDiffEngine._build_header_index_map(row_headers, all_headers)
+        return TabularDiffEngine._align_row_with_map(row, col_map)

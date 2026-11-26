@@ -4,7 +4,7 @@ Includes:
 - Windows Explorer Context Menu integration ("Select Left", "Select Right", "Select files to compare")
 - Home / Welcome Studio launcher
 - Git Difftool & Mergetool CLI integration
-- Intelligent multi-format routing (Folders, Text, Images, Tables, Structured, Hex).
+- Intelligent multi-format routing (Folders, Text, Images/PDF, Tables, Structured, Contracts, Hex).
 """
 
 import sys
@@ -17,10 +17,10 @@ if repo_root not in sys.path:
 
 import argparse
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from app.ui.main_window import MainWindow
+from app.ui.styles.theme import MODERN_LIGHT_QSS
 from app.core.shell_integration import (
     get_left_path, set_left_path, show_native_notification,
     install_context_menu, uninstall_context_menu,
@@ -37,12 +37,14 @@ def parse_arguments(args_list=None):
     parser.add_argument("--merge", "-m", nargs=3, metavar=("MINE", "BASE", "THEIRS"), help="Perform 3-way merge")
     parser.add_argument("--output", "-o", metavar="OUTPUT", help="Merged output path for 3-way merge")
     parser.add_argument("--folder-diff", nargs=2, metavar=("DIR1", "DIR2"), help="Compare two directories or archives")
-    parser.add_argument("--image-diff", nargs=2, metavar=("IMG1", "IMG2"), help="Compare two image files")
-    parser.add_argument("--table-diff", nargs=2, metavar=("CSV1", "CSV2"), help="Compare two CSV/Excel tables")
+    parser.add_argument("--image-diff", nargs=2, metavar=("IMG1", "IMG2"), help="Compare two image/PDF files")
+    parser.add_argument("--table-diff", nargs=2, metavar=("CSV1", "CSV2"), help="Compare two CSV/Excel/Parquet/SQLite tables")
+    parser.add_argument("--contract-diff", nargs=2, metavar=("SPEC1", "SPEC2"), help="Audit two API contracts (OpenAPI/GraphQL/Protobuf)")
     parser.add_argument("--hex-diff", nargs=2, metavar=("BIN1", "BIN2"), help="Compare two binary files in hex mode")
 
     # Batch Command Line & Headless CI/CD Reporting arguments
     parser.add_argument("--report-html", metavar="HTML_PATH", help="Generate standalone HTML comparison report")
+    parser.add_argument("--report-json", metavar="JSON_PATH", help="Generate JSON comparison report (contract diff)")
     parser.add_argument("--exit-code", action="store_true", help="Return standard exit codes (0=match, 1=mismatch, 2=error)")
     parser.add_argument("--headless", action="store_true", help="Run in headless non-GUI automated mode")
     parser.add_argument("--new-window", action="store_true", help="Open in a new window instead of existing instance")
@@ -58,6 +60,24 @@ def parse_arguments(args_list=None):
     parser.add_argument("--export-reg", metavar="FILE", help="Export complete Windows Registry (.reg) file for this installation")
 
     return parser.parse_known_args(args_list)
+
+
+def _materialize_stdin_args(argv_list):
+    """Replaces '-' stdin arguments with materialized temp file paths before IPC forwarding."""
+    if "-" not in argv_list:
+        return argv_list
+    from app.core.stream_diff import resolve_stream_input
+    resolved = list(argv_list)
+    for idx, val in enumerate(resolved):
+        if val == "-":
+            other = None
+            if idx + 1 < len(resolved) and not resolved[idx + 1].startswith("-"):
+                other = resolved[idx + 1]
+            elif idx > 0 and not resolved[idx - 1].startswith("-"):
+                other = resolved[idx - 1]
+            temp_path, _ = resolve_stream_input("-", other)
+            resolved[idx] = temp_path
+    return resolved
 
 
 def main():
@@ -86,7 +106,7 @@ def main():
         return
 
     # Headless CI/CD Automated Execution
-    if args.report_html or args.exit_code or args.headless:
+    if args.report_html or args.report_json or args.exit_code or args.headless:
         from app.core.headless_reporter import HeadlessReporter
         exit_code = 0
         summary = ""
@@ -94,6 +114,12 @@ def main():
         if args.folder_diff:
             exit_code, summary = HeadlessReporter.run_folder_comparison(
                 args.folder_diff[0], args.folder_diff[1], report_html_path=args.report_html
+            )
+        elif args.contract_diff:
+            exit_code, summary = HeadlessReporter.run_contract_comparison(
+                args.contract_diff[0], args.contract_diff[1],
+                report_html_path=args.report_html,
+                report_json_path=args.report_json
             )
         elif args.diff:
             from app.core.stream_diff import resolve_stream_input
@@ -116,12 +142,14 @@ def main():
                     p1, p2, report_html_path=args.report_html
                 )
         else:
-            print("Error: In headless mode, specify two files or folders using --folder-diff, --diff, or positional arguments.")
+            print("Error: In headless mode, specify two files or folders using --folder-diff, --contract-diff, --diff, or positional arguments.")
             sys.exit(2)
 
         print(summary)
         if args.report_html:
-            print(f"Report generated at: {os.path.abspath(args.report_html)}")
+            print(f"HTML Report generated at: {os.path.abspath(args.report_html)}")
+        if args.report_json:
+            print(f"JSON Report generated at: {os.path.abspath(args.report_json)}")
         sys.exit(exit_code)
 
     # Handle --select-left (quietly caches path and shows friendly notification)
@@ -147,6 +175,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("diff_and_compare_tool")
     app.setOrganizationName("diff_and_compare_tool")
+    app.setStyleSheet(MODERN_LIGHT_QSS)
 
     # Native Windows modern font stack
     app_font = QFont("Segoe UI", 10)
@@ -157,18 +186,25 @@ def main():
     app_icon = get_app_icon()
     app.setWindowIcon(app_icon)
 
+    # Materialize stdin '-' before forwarding over IPC so the running instance receives a real file path
+    forwarded_args = _materialize_stdin_args(sys.argv[1:])
+
     # Single-Instance IPC Check: forward arguments to running instance if one exists
     from app.core.ipc_manager import SingleInstanceManager
-    if SingleInstanceManager.try_send_to_existing_instance(sys.argv[1:]):
+    if SingleInstanceManager.try_send_to_existing_instance(forwarded_args):
         sys.exit(0)
 
     window = MainWindow()
     window.setWindowIcon(app_icon)
 
-    # Start IPC server to receive commands from subsequent instances
-    ipc_manager = SingleInstanceManager(window)
-    ipc_manager.start_server(lambda payload: window.handle_remote_args(payload.get("args", []), payload.get("cwd", "")))
-    app.aboutToQuit.connect(ipc_manager.cleanup)
+    # Only bind IPC server on primary window (never steal the pipe when --new-window is specified)
+    if not args.new_window:
+        ipc_manager = SingleInstanceManager(window)
+        ipc_manager.start_server(lambda payload: window.handle_remote_args(payload.get("args", []), payload.get("cwd", "")))
+        app.aboutToQuit.connect(ipc_manager.cleanup)
+
+    # Re-parse forwarded_args in case stdin '-' was materialized
+    args, _ = parse_arguments(forwarded_args)
 
     # Handle --select-right
     if args.select_right:
@@ -203,6 +239,8 @@ def main():
 
     elif args.folder_diff:
         window.open_folder_diff(args.folder_diff[0], args.folder_diff[1])
+    elif args.contract_diff:
+        window.open_contract_diff(args.contract_diff[0], args.contract_diff[1])
     elif args.diff:
         from app.core.stream_diff import resolve_stream_input
         p1, t1 = resolve_stream_input(args.diff[0], args.diff[1])
@@ -224,7 +262,6 @@ def main():
     elif len(args.files) == 3:
         window.open_3way_merge(args.files[0], args.files[1], args.files[2], args.output)
     else:
-        # Default: Show Home / Welcome screen!
         window.tabs.setCurrentWidget(window.home_tab)
 
     window.show()

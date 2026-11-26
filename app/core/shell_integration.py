@@ -182,6 +182,8 @@ def install_context_menu(target_exe: Optional[str] = None, icon_path: Optional[s
     and 'diff_and_compare_tool: Select Right' in the Windows Explorer context menu.
     Requires no Administrator privileges (installs in HKCU).
     """
+    if winreg is None:
+        return False, "Windows Registry integration is only supported on Windows."
     cmd_prefix = get_executable_command(target_exe)
     resolved_icon = get_app_icon_path(icon_path)
 
@@ -226,6 +228,8 @@ def install_context_menu(target_exe: Optional[str] = None, icon_path: Optional[s
 
 def uninstall_context_menu() -> Tuple[bool, str]:
     """Removes all registered context menu keys (including legacy keys) from HKCU."""
+    if winreg is None:
+        return False, "Windows Registry integration is only supported on Windows."
     all_key_names = [item["key_name"] for item in MENU_ITEMS] + LEGACY_KEYS
     try:
         for target_root in REG_TARGETS:
@@ -247,6 +251,8 @@ def uninstall_context_menu() -> Tuple[bool, str]:
 
 def is_context_menu_installed() -> bool:
     """Checks if the context menu items exist in the registry."""
+    if winreg is None:
+        return False
     for key_name in ["DiffAndCompareToolCompare", "DiffAndCompareToolSelectLeft", "BeyondCompareCompare", "DiffAndCompareSelectLeft"]:
         test_key = rf"Software\Classes\*\shell\{key_name}\command"
         try:
@@ -262,6 +268,8 @@ def install_app_paths(target_exe: Optional[str] = None) -> Tuple[bool, str]:
     Registers the application executable under App Paths in HKCU.
     Allows running 'diff_and_compare' or 'diff_and_compare_tool' from Win+R, CMD, or PowerShell.
     """
+    if winreg is None:
+        return False, "Windows Registry integration is only supported on Windows."
     if target_exe:
         resolved_exe = os.path.abspath(target_exe)
     elif getattr(sys, "frozen", False):
@@ -289,6 +297,8 @@ def install_app_paths(target_exe: Optional[str] = None) -> Tuple[bool, str]:
 
 def uninstall_app_paths() -> Tuple[bool, str]:
     """Removes App Paths registration from HKCU."""
+    if winreg is None:
+        return False, "Windows Registry integration is only supported on Windows."
     app_names = ["diff_and_compare.exe", "diff_and_compare_tool.exe"]
     try:
         for app in app_names:
@@ -307,6 +317,8 @@ def install_uninstall_entry(install_dir: Optional[str] = None, target_exe: Optio
     Registers diff_and_compare_tool in Windows 'Installed Apps' / 'Add or Remove Programs'
     under HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\diff_and_compare_tool.
     """
+    if winreg is None:
+        return False, "Windows Registry integration is only supported on Windows."
     if target_exe:
         resolved_exe = os.path.abspath(target_exe)
     elif getattr(sys, "frozen", False):
@@ -357,6 +369,8 @@ def install_uninstall_entry(install_dir: Optional[str] = None, target_exe: Optio
 
 def uninstall_uninstall_entry() -> Tuple[bool, str]:
     """Removes the Uninstall entry from HKCU."""
+    if winreg is None:
+        return False, "Windows Registry integration is only supported on Windows."
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\diff_and_compare_tool"
     try:
         winreg.DeleteKey(winreg.HKEY_CURRENT_USER, key_path)
@@ -418,79 +432,79 @@ def generate_reg_content(target_exe: Optional[str] = None, icon_path: Optional[s
 ; ---------------------------------------------
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolCompare]
 @="Compare with diff_and_compare_tool"
-"Icon"="\\"{reg_icon}\\""
+"Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolCompare\\command]
-@="\\"\\"{reg_exe}\\" --compare \\"%1\\"\\""
+@="\\"{reg_exe}\\" --compare \\"%1\\""
 
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolSelectLeft]
 @="diff_and_compare_tool: Select Left"
-"Icon"="\\"{reg_icon}\\""
+"Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolSelectLeft\\command]
-@="\\"\\"{reg_exe}\\" --select-left \\"%1\\"\\""
+@="\\"{reg_exe}\\" --select-left \\"%1\\""
 
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolSelectRight]
 @="diff_and_compare_tool: Select Right"
-"Icon"="\\"{reg_icon}\\""
+"Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\*\\shell\\DiffAndCompareToolSelectRight\\command]
-@="\\"\\"{reg_exe}\\" --select-right \\"%1\\"\\""
+@="\\"{reg_exe}\\" --select-right \\"%1\\""
 
 ; ---------------------------------------------
 ; 2. Explorer Context Menu: Directories / Folders
 ; ---------------------------------------------
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolCompare]
 @="Compare with diff_and_compare_tool"
-"Icon"="\\"{reg_icon}\\""
+"Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolCompare\\command]
-@="\\"\\"{reg_exe}\\" --compare \\"%1\\"\\""
+@="\\"{reg_exe}\\" --compare \\"%1\\""
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolSelectLeft]
 @="diff_and_compare_tool: Select Left"
-"Icon"="\\"{reg_icon}\\""
+"Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolSelectLeft\\command]
-@="\\"\\"{reg_exe}\\" --select-left \\"%1\\"\\""
+@="\\"{reg_exe}\\" --select-left \\"%1\\""
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolSelectRight]
 @="diff_and_compare_tool: Select Right"
-"Icon"="\\"{reg_icon}\\""
+"Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\shell\\DiffAndCompareToolSelectRight\\command]
-@="\\"\\"{reg_exe}\\" --select-right \\"%1\\"\\""
+@="\\"{reg_exe}\\" --select-right \\"%1\\""
 
 ; ---------------------------------------------
 ; 3. Explorer Context Menu: Directory Background (Empty Space)
 ; ---------------------------------------------
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\Background\\shell\\DiffAndCompareToolCompare]
 @="Compare with diff_and_compare_tool"
-"Icon"="\\"{reg_icon}\\""
+"Icon"="{reg_icon}"
 
 [HKEY_CURRENT_USER\\Software\\Classes\\Directory\\Background\\shell\\DiffAndCompareToolCompare\\command]
-@="\\"\\"{reg_exe}\\" --compare \\"%V\\"\\""
+@="\\"{reg_exe}\\" --compare \\"%V\\""
 
 ; ---------------------------------------------
 ; 4. Windows App Paths (Win+R / CMD launch)
 ; ---------------------------------------------
 [HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\diff_and_compare.exe]
-@="\\"{reg_exe}\\""
-"Path"="\\"{reg_dir}\\""
+@="{reg_exe}"
+"Path"="{reg_dir}"
 
 [HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\diff_and_compare_tool.exe]
-@="\\"{reg_exe}\\""
-"Path"="\\"{reg_dir}\\""
+@="{reg_exe}"
+"Path"="{reg_dir}"
 
 ; ---------------------------------------------
 ; 5. Windows Add/Remove Programs (Installed Apps)
 ; ---------------------------------------------
-[HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\\\Uninstall\\diff_and_compare_tool]
+[HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\diff_and_compare_tool]
 "DisplayName"="{APP_DISPLAY_NAME}"
 "DisplayVersion"="{APP_VERSION}"
 "Publisher"="{APP_PUBLISHER}"
-"DisplayIcon"="\\"{reg_exe}\\",0"
-"InstallLocation"="\\"{reg_dir}\\""
+"DisplayIcon"="{reg_exe},0"
+"InstallLocation"="{reg_dir}"
 "UninstallString"="powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\"{reg_dir}\\\\uninstall.ps1\\""
 "QuietUninstallString"="powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\"{reg_dir}\\\\uninstall.ps1\\" -Silent"
 "NoModify"=dword:00000001

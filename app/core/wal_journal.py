@@ -12,6 +12,7 @@ import sys
 import time
 import json
 import glob
+import uuid
 from typing import Optional, List, Dict, Any
 
 
@@ -20,7 +21,7 @@ class WALJournal:
 
     def __init__(self, session_id: Optional[str] = None):
         self.storage_dir = self.get_wal_dir()
-        self.session_id = session_id or f"session_{int(time.time())}_{os.getpid()}"
+        self.session_id = session_id or f"session_{int(time.time())}_{os.getpid()}_{uuid.uuid4().hex[:8]}"
         self.wal_path = os.path.join(self.storage_dir, f"{self.session_id}.wal")
         self._file_handle = None
         self._init_journal()
@@ -108,8 +109,9 @@ class WALJournal:
         current_pid = os.getpid()
 
         for wal_file in wal_files:
+            base_name = os.path.basename(wal_file)
             # Skip journals belonging to the currently running process
-            if f"_{current_pid}.wal" in wal_file:
+            if f"_{current_pid}_" in base_name or base_name.endswith(f"_{current_pid}.wal"):
                 continue
 
             try:

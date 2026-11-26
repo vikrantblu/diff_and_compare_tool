@@ -13,10 +13,20 @@ Features:
 import os
 import time
 import fnmatch
+import hashlib
+import zlib
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple, Set
 from app.core.diff_engine import DiffEngine
 from app.core.archive_vfs import ArchiveVFS
+from app.core.file_io import is_vfs_path, read_vfs_or_file_bytes
+
+try:
+    import blake3
+    HAS_BLAKE3 = True
+except ImportError:
+    HAS_BLAKE3 = False
 
 
 @dataclass
@@ -150,22 +160,22 @@ class FolderCompareEngine:
         # Merge all relative paths
         all_rel_paths = set(left_entries.keys()) | set(right_entries.keys())
 
-        # Apply name filters
-        filtered_paths = FolderCompareEngine._apply_filters(all_rel_paths, filter_expr)
+        # Apply name filters (preserving directory structure and multi-include OR semantics)
+        dir_paths = {
+            p for p in all_rel_paths
+            if (left_entries.get(p, {}).get("is_dir") or right_entries.get(p, {}).get("is_dir"))
+        }
+        filtered_paths = FolderCompareEngine._apply_filters(all_rel_paths, filter_expr, dir_paths=dir_paths)
 
         total_to_compare = len(filtered_paths)
         if progress_callback:
             progress_callback(0, f"Comparing {total_to_compare:,} files and folders...")
 
-        # Build flat items with comparison
+        # Build flat items; parallelize file content comparison when hashing many same-size pairs
         flat_items: Dict[str, FolderCompareItem] = {}
-        processed_count = 0
+        pairs_to_compare: List[Tuple[str, FolderCompareItem]] = []
 
         for rel_p in filtered_paths:
-            processed_count += 1
-            if progress_callback and (processed_count % 300 == 0 or processed_count == total_to_compare):
-                progress_callback(processed_count, f"Comparing items ({processed_count:,}/{total_to_compare:,})...")
-
             l_info = left_entries.get(rel_p)
             r_info = right_entries.get(rel_p)
 
@@ -184,7 +194,6 @@ class FolderCompareEngine:
                 right_mtime=r_info["mtime"] if r_info else None
             )
 
-            # Evaluate status
             if l_info and not r_info:
                 item.status = "LEFT_ONLY"
                 item.diff_reason = "Orphan on Left"
@@ -194,15 +203,35 @@ class FolderCompareEngine:
             elif is_dir:
                 item.status = "SAME"
             else:
-                # Compare file contents
-                item.status, item.diff_reason = FolderCompareEngine._compare_files(
-                    l_info["full_path"], r_info["full_path"],
-                    l_info["size"], r_info["size"],
-                    l_info["mtime"], r_info["mtime"],
-                    mode
-                )
+                pairs_to_compare.append((rel_p, item))
 
             flat_items[rel_p] = item
+
+        def _eval_pair(pair: Tuple[str, FolderCompareItem]) -> Tuple[FolderCompareItem, str, str]:
+            _, it = pair
+            st, reason = FolderCompareEngine._compare_files(
+                it.left_path, it.right_path,
+                it.left_size or 0, it.right_size or 0,
+                it.left_mtime or 0.0, it.right_mtime or 0.0,
+                mode
+            )
+            return it, st, reason
+
+        if mode in ("hash", "blake3") and len(pairs_to_compare) > 25:
+            max_workers = min(8, os.cpu_count() or 4)
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                for idx, (it, st, reason) in enumerate(pool.map(_eval_pair, pairs_to_compare), 1):
+                    it.status = st
+                    it.diff_reason = reason
+                    if progress_callback and (idx % 300 == 0 or idx == len(pairs_to_compare)):
+                        progress_callback(idx, f"Comparing items ({idx:,}/{len(pairs_to_compare):,})...")
+        else:
+            for idx, pair in enumerate(pairs_to_compare, 1):
+                it, st, reason = _eval_pair(pair)
+                it.status = st
+                it.diff_reason = reason
+                if progress_callback and (idx % 300 == 0 or idx == len(pairs_to_compare)):
+                    progress_callback(idx, f"Comparing items ({idx:,}/{len(pairs_to_compare):,})...")
 
         # Build hierarchy tree
         return FolderCompareEngine._build_tree(flat_items)
@@ -221,8 +250,21 @@ class FolderCompareEngine:
         if ArchiveVFS.is_archive(target_path):
             for entry in ArchiveVFS.list_entries(target_path):
                 norm_p = entry.path.replace("\\", "/").strip("/")
+                if not norm_p:
+                    continue
                 if respect_gitignore and FolderCompareEngine.is_path_ignored(norm_p, entry.is_dir, rules):
                     continue
+                # Synthesize implicit parent directory entries for archives that omit explicit dir records
+                parts = norm_p.split("/")
+                for depth in range(1, len(parts)):
+                    ancestor = "/".join(parts[:depth])
+                    if ancestor not in entries:
+                        entries[ancestor] = {
+                            "full_path": f"{target_path}#{ancestor}",
+                            "is_dir": True,
+                            "size": 0,
+                            "mtime": entry.mtime,
+                        }
                 count += 1
                 entries[norm_p] = {
                     "full_path": f"{target_path}#{norm_p}",
@@ -286,14 +328,28 @@ class FolderCompareEngine:
         return entries
 
     @staticmethod
+    def _hash_path_or_vfs(path: str, algo: str) -> Optional[str]:
+        """Hashes either a disk file (via mmap/streaming) or an ArchiveVFS entry."""
+        if not is_vfs_path(path):
+            return DiffEngine.hash_file(path, algo)
+        try:
+            data = read_vfs_or_file_bytes(path)
+            if algo.lower() in ("blake3", "b3") and HAS_BLAKE3:
+                return blake3.blake3(data).hexdigest()
+            if algo.lower() == "crc32":
+                return f"{zlib.crc32(data) & 0xffffffff:08x}"
+            return hashlib.new(algo, data).hexdigest()
+        except Exception:
+            return None
+
+    @staticmethod
     def _compare_files(
         l_path: str, r_path: str,
         l_size: int, r_size: int,
         l_mtime: float, r_mtime: float,
         mode: str
     ) -> Tuple[str, str]:
-        """Compares two files and returns (status, reason)."""
-        # Fast Size check
+        """Compares two files (including ArchiveVFS entries) and returns (status, reason)."""
         if mode == "timestamp":
             if l_size != r_size:
                 return "DIFF", f"Size differs ({l_size:,} vs {r_size:,})"
@@ -303,15 +359,12 @@ class FolderCompareEngine:
             return "SAME", "Size & timestamp match"
 
         if mode == "rules":
-            # Rules-based: Ignore whitespace and line-endings in text files
             try:
-                with open(l_path, "r", encoding="utf-8", errors="replace") as f1, \
-                     open(r_path, "r", encoding="utf-8", errors="replace") as f2:
-                    t1 = "".join(f1.read().split())
-                    t2 = "".join(f2.read().split())
-                    if t1 == t2:
-                        return "SAME", "Rules match (ignoring whitespace)"
-                    return "DIFF", "Content differs"
+                t1_raw = read_vfs_or_file_bytes(l_path).decode("utf-8", errors="replace")
+                t2_raw = read_vfs_or_file_bytes(r_path).decode("utf-8", errors="replace")
+                if "".join(t1_raw.split()) == "".join(t2_raw.split()):
+                    return "SAME", "Rules match (ignoring whitespace)"
+                return "DIFF", "Content differs"
             except Exception:
                 pass
 
@@ -320,37 +373,50 @@ class FolderCompareEngine:
             return "DIFF", f"Size differs ({l_size:,} vs {r_size:,})"
 
         algo = "blake3" if mode == "blake3" else "sha256"
-        h1 = DiffEngine.hash_file(l_path, algo)
-        h2 = DiffEngine.hash_file(r_path, algo)
-        if h1 and h2 and h1 == h2:
+        h1 = FolderCompareEngine._hash_path_or_vfs(l_path, algo)
+        h2 = FolderCompareEngine._hash_path_or_vfs(r_path, algo)
+        if h1 is not None and h2 is not None and h1 == h2:
             return "SAME", f"{algo.upper()} Content Match"
         return "DIFF", f"{algo.upper()} Hash mismatch"
 
     @staticmethod
-    def _apply_filters(paths: Set[str], filter_expr: str) -> Set[str]:
-        """Applies inclusion/exclusion patterns like '*.py', '-*.tmp', '-kb_*.*'."""
+    def _apply_filters(paths: Set[str], filter_expr: str, dir_paths: Optional[Set[str]] = None) -> Set[str]:
+        """
+        Applies inclusion/exclusion patterns like '*.py; *.md; -*.tmp'.
+        Multiple positive patterns use OR semantics; exclusion patterns ('-...') override inclusions;
+        ancestor directories of kept files are preserved.
+        """
         if not filter_expr or not filter_expr.strip():
             return paths
 
         patterns = [p.strip() for p in filter_expr.split(";") if p.strip()]
-        result = set()
+        includes = [p for p in patterns if not p.startswith("-")]
+        excludes = [p[1:] for p in patterns if p.startswith("-") and len(p) > 1]
+
+        dir_paths = dir_paths or set()
+        kept_files: Set[str] = set()
+        kept_dirs: Set[str] = set()
 
         for p in paths:
             filename = os.path.basename(p)
-            keep = True
-            for pat in patterns:
-                if pat.startswith("-"):
-                    # Exclusion pattern
-                    if fnmatch.fnmatch(filename, pat[1:]):
-                        keep = False
-                        break
-                else:
-                    # Inclusion pattern
-                    if not fnmatch.fnmatch(filename, pat):
-                        keep = False
-            if keep:
-                result.add(p)
+            if any(fnmatch.fnmatch(filename, exc) or fnmatch.fnmatch(p, exc) for exc in excludes):
+                continue
+            if p in dir_paths:
+                if not includes:
+                    kept_dirs.add(p)
+                continue
+            if includes and not any(fnmatch.fnmatch(filename, inc) or fnmatch.fnmatch(p, inc) for inc in includes):
+                continue
+            kept_files.add(p)
 
+        # Ensure every ancestor folder of a kept file is included so the tree remains intact
+        result = set(kept_files) | kept_dirs
+        for p in kept_files:
+            parent = os.path.dirname(p).replace("\\", "/")
+            while parent:
+                if parent in paths and not any(fnmatch.fnmatch(os.path.basename(parent), exc) for exc in excludes):
+                    result.add(parent)
+                parent = os.path.dirname(parent).replace("\\", "/")
         return result
 
     @staticmethod
@@ -360,6 +426,19 @@ class FolderCompareEngine:
         for it in items:
             if it.children:
                 FolderCompareEngine._sort_tree(it.children)
+
+    @staticmethod
+    def _propagate_dir_status(items: List[FolderCompareItem]) -> bool:
+        """Recursively propagates child mismatch status upward to all ancestor folders present on both sides."""
+        any_diff_here = False
+        for it in items:
+            if it.children:
+                child_has_diff = FolderCompareEngine._propagate_dir_status(it.children)
+                if child_has_diff and it.left_path and it.right_path:
+                    it.status = "DIFF"
+            if it.status != "SAME":
+                any_diff_here = True
+        return any_diff_here
 
     @staticmethod
     def _build_tree(flat_items: Dict[str, FolderCompareItem]) -> List[FolderCompareItem]:
@@ -378,14 +457,12 @@ class FolderCompareEngine:
             elif parent_dir in path_to_item:
                 parent_item = path_to_item[parent_dir]
                 parent_item.children.append(item)
-                # Only mark parent as DIFF if it exists on BOTH sides!
-                if parent_item.left_path and parent_item.right_path:
-                    if item.status != "SAME":
-                        parent_item.status = "DIFF"
             else:
                 root_items.append(item)
             path_to_item[p] = item
 
+        # Bottom-up propagation ensures multi-level parent/grandparent folders reflect child diffs
+        FolderCompareEngine._propagate_dir_status(root_items)
         # Organize by folders first, then files
         FolderCompareEngine._sort_tree(root_items)
         return root_items

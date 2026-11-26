@@ -43,7 +43,8 @@ def build():
         "pyarrow.parquet",
         "fitz",
         "jsonpath_ng",
-        "openpyxl"
+        "openpyxl",
+        "defusedxml"
     ]
 
     cmd = [
@@ -53,7 +54,8 @@ def build():
         "--windowed",
         "--name", f"diff_and_compare_{target}",
         "--icon", "assets/app_icon.ico",
-        "--add-data", "assets;assets"
+        "--add-data", "assets;assets",
+        "--add-data", "app/ui/styles/assets;app/ui/styles/assets"
     ]
 
     for ex in excludes:
