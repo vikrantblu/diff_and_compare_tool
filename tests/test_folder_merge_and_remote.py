@@ -218,6 +218,47 @@ class TestFolderMergeAndRemote(unittest.TestCase):
         self.assertIn("deploy-pages", content)
         self.assertIn('path: "docs"', content)
 
+    def test_brand_assets_studio_badges_and_home_remote_signal(self):
+        from PIL import Image
+        from app.ui.styles.icons import STUDIO_BADGE_THEMES, get_studio_badge_pixmap, get_studio_badge_icon
+        from app.ui.home_view import HomeView
+
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        expected_assets = [
+            "assets/app_icon.png",
+            "assets/app_icon.ico",
+            "assets/installer_wizard.bmp",
+            "assets/installer_small.bmp",
+            "docs/assets/app_icon.png",
+            "docs/assets/hero_banner.png",
+        ]
+        for rel in expected_assets:
+            full = os.path.join(root, rel.replace("/", os.sep))
+            self.assertTrue(os.path.isfile(full), f"Missing brand asset: {rel}")
+            with Image.open(full) as im:
+                self.assertGreater(im.size[0], 0)
+                self.assertGreater(im.size[1], 0)
+
+        for mode_id in STUDIO_BADGE_THEMES:
+            pm = get_studio_badge_pixmap(mode_id, size=48)
+            ic = get_studio_badge_icon(mode_id, size=20)
+            self.assertFalse(pm.isNull(), f"Null badge pixmap for {mode_id}")
+            self.assertFalse(ic.isNull(), f"Null badge icon for {mode_id}")
+
+        hv = HomeView()
+        try:
+            self.assertTrue(hasattr(hv, "btn_remote_profiles"))
+            fired = []
+            hv.remoteProfilesRequested.connect(lambda: fired.append(True))
+            hv.btn_remote_profiles.click()
+            self.assertEqual(fired, [True])
+        finally:
+            hv.close()
+            hv.deleteLater()
+            gc.collect()
+            QApplication.sendPostedEvents()
+            QApplication.processEvents()
+
 
 if __name__ == "__main__":
     unittest.main()

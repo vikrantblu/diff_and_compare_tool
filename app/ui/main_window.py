@@ -36,7 +36,7 @@ from app.ui.dialogs.git_changes_dialog import GitChangesDialog
 from app.ui.dialogs.remote_profile_dialog import RemoteProfileDialog
 
 from app.ui.styles.theme import MODERN_LIGHT_QSS
-from app.ui.styles.icons import get_line_icon, get_app_icon
+from app.ui.styles.icons import get_line_icon, get_app_icon, get_studio_badge_icon
 from app.ui.styles.windows_effects import apply_windows_material, BACKDROP_MICA_ALT
 from app.core.session_manager import SessionManager
 from app.core.archive_vfs import ArchiveVFS
@@ -116,12 +116,13 @@ class MainWindow(QMainWindow):
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
         self.home_tab = HomeView()
-        self.tabs.addTab(self.home_tab, get_line_icon("sparkles", "#0969da"), " Home")
+        self.tabs.addTab(self.home_tab, get_app_icon(), " Home")
         self.tabs.setTabToolTip(0, "diff_and_compare Home / Welcome Screen & Session Launcher")
         self.home_tab.sessionSelected.connect(self._on_home_session_selected)
         self.home_tab.compareFilesRequested.connect(self.smart_open_comparison)
         self.home_tab.clipboardCompareRequested.connect(self._compare_clipboard)
         self.home_tab.gitChangesRequested.connect(self.open_git_changes_browser)
+        self.home_tab.remoteProfilesRequested.connect(self._open_remote_profiles_dialog)
         self._update_tab_close_buttons()
 
         c_row = QWidget()
@@ -130,7 +131,7 @@ class MainWindow(QMainWindow):
         r_layout.setSpacing(6)
 
         self.btn_home_corner = QPushButton(" Home")
-        self.btn_home_corner.setIcon(get_line_icon("sparkles", "#0969da"))
+        self.btn_home_corner.setIcon(get_app_icon())
         self.btn_home_corner.setFixedHeight(28)
         self.btn_home_corner.clicked.connect(self.show_home_tab)
         r_layout.addWidget(self.btn_home_corner)
@@ -140,15 +141,15 @@ class MainWindow(QMainWindow):
         self.btn_new_tab.setFixedHeight(28)
 
         new_menu = QMenu(self)
-        new_menu.addAction(get_line_icon("diff", "#0969da"), "Text & Code Comparison").triggered.connect(lambda: self.add_new_tab("text"))
-        new_menu.addAction(get_line_icon("git-merge", "#1a7f37"), "3-Way Merge Studio").triggered.connect(lambda: self.add_new_tab("merge"))
-        new_menu.addAction(get_line_icon("folder", "#0969da"), "Folder / Archive / Remote Comparison").triggered.connect(lambda: self.add_new_tab("folder"))
-        new_menu.addAction(get_line_icon("folder-merge", "#b45309"), "3-Way Folder Merge Studio").triggered.connect(lambda: self.add_new_tab("folder_merge"))
-        new_menu.addAction(get_line_icon("image", "#8250df"), "Image & PDF Diff").triggered.connect(lambda: self.add_new_tab("image"))
-        new_menu.addAction(get_line_icon("table", "#1a7f37"), "Tabular / CSV Spreadsheet Diff").triggered.connect(lambda: self.add_new_tab("table"))
-        new_menu.addAction(get_line_icon("code", "#cf222e"), "Structured Data (JSON/YAML/XML)").triggered.connect(lambda: self.add_new_tab("structured"))
-        new_menu.addAction(get_line_icon("shield", "#0969da"), "API Contract Audit (OpenAPI/GraphQL/Proto)").triggered.connect(lambda: self.add_new_tab("contract"))
-        new_menu.addAction(get_line_icon("cpu", "#57606a"), "Hex & Binary Inspector").triggered.connect(lambda: self.add_new_tab("hex"))
+        new_menu.addAction(get_studio_badge_icon("text"), "Text & Code Comparison").triggered.connect(lambda: self.add_new_tab("text"))
+        new_menu.addAction(get_studio_badge_icon("merge"), "3-Way Merge Studio").triggered.connect(lambda: self.add_new_tab("merge"))
+        new_menu.addAction(get_studio_badge_icon("folder"), "Folder / Archive / Remote Comparison").triggered.connect(lambda: self.add_new_tab("folder"))
+        new_menu.addAction(get_studio_badge_icon("folder_merge"), "3-Way Folder Merge Studio").triggered.connect(lambda: self.add_new_tab("folder_merge"))
+        new_menu.addAction(get_studio_badge_icon("image"), "Image & PDF Diff").triggered.connect(lambda: self.add_new_tab("image"))
+        new_menu.addAction(get_studio_badge_icon("table"), "Tabular / CSV Spreadsheet Diff").triggered.connect(lambda: self.add_new_tab("table"))
+        new_menu.addAction(get_studio_badge_icon("structured"), "Structured Data (JSON/YAML/XML)").triggered.connect(lambda: self.add_new_tab("structured"))
+        new_menu.addAction(get_studio_badge_icon("contract"), "API Contract Audit (OpenAPI/GraphQL/Proto)").triggered.connect(lambda: self.add_new_tab("contract"))
+        new_menu.addAction(get_studio_badge_icon("hex"), "Hex & Binary Inspector").triggered.connect(lambda: self.add_new_tab("hex"))
 
         self.btn_new_tab.setMenu(new_menu)
         r_layout.addWidget(self.btn_new_tab)
@@ -201,7 +202,7 @@ class MainWindow(QMainWindow):
     def show_home_tab(self):
         idx = self.tabs.indexOf(self.home_tab)
         if idx == -1:
-            self.tabs.insertTab(0, self.home_tab, get_line_icon("sparkles", "#0969da"), " Home")
+            self.tabs.insertTab(0, self.home_tab, get_app_icon(), " Home")
             self.tabs.setTabToolTip(0, "diff_and_compare Home / Welcome Screen & Session Launcher")
             self._update_tab_close_buttons()
             self.tabs.setCurrentIndex(0)
@@ -284,13 +285,13 @@ class MainWindow(QMainWindow):
             w.filesChanged.connect(lambda lp, rp, widget=w: self._update_widget_tab_title(widget, lp, rp, " 2-Way Text"))
             count = self._count_tabs(DiffView)
             title = " 2-Way Text" if count == 0 else f" Text Diff ({count + 1})"
-            idx = self.tabs.addTab(w, get_line_icon("diff", "#0969da"), title)
+            idx = self.tabs.addTab(w, get_studio_badge_icon("text"), title)
             self.tabs.setTabToolTip(idx, "2-Way Side-by-Side Text & Code Difference Studio")
         elif mode == "merge":
             w = MergeView()
             count = self._count_tabs(MergeView)
             title = " 3-Way Merge" if count == 0 else f" Merge ({count + 1})"
-            idx = self.tabs.addTab(w, get_line_icon("git-merge", "#1a7f37"), title)
+            idx = self.tabs.addTab(w, get_studio_badge_icon("merge"), title)
             self.tabs.setTabToolTip(idx, "3-Way Ancestor Conflict Resolution Merge Studio")
         elif mode == "folder_merge":
             w = FolderMergeView()
@@ -298,7 +299,7 @@ class MainWindow(QMainWindow):
             w.homeRequested.connect(self.show_home_tab)
             count = self._count_tabs(FolderMergeView)
             title = " 3-Way Folder Merge" if count == 0 else f" Folder Merge ({count + 1})"
-            idx = self.tabs.addTab(w, get_line_icon("folder-merge", "#b45309"), title)
+            idx = self.tabs.addTab(w, get_studio_badge_icon("folder_merge"), title)
             self.tabs.setTabToolTip(idx, "True Ancestor-Based 3-Way Folder Merge Studio")
         elif mode in ("folder", "folder_sync"):
             w = DirCompareView(initial_mode=mode)
@@ -306,33 +307,31 @@ class MainWindow(QMainWindow):
             w.homeRequested.connect(self.show_home_tab)
             count = self._count_tabs(DirCompareView)
             base_title = " Folders & VFS" if mode == "folder" else " Folder Sync"
-            icon_name = "folder" if mode == "folder" else "folder-sync"
-            icon_color = "#0969da" if mode == "folder" else "#059669"
             title = base_title if count == 0 else f"{base_title} ({count + 1})"
-            idx = self.tabs.addTab(w, get_line_icon(icon_name, icon_color), title)
+            idx = self.tabs.addTab(w, get_studio_badge_icon(mode), title)
             self.tabs.setTabToolTip(idx, "Dual-Tree Directory, Virtual Archive & Remote Comparison")
         elif mode == "image":
             w = ImageDiffView()
             count = self._count_tabs(ImageDiffView)
             title = " Image Diff" if count == 0 else f" Image Diff ({count + 1})"
-            idx = self.tabs.addTab(w, get_line_icon("image", "#8250df"), title)
+            idx = self.tabs.addTab(w, get_studio_badge_icon("image"), title)
             self.tabs.setTabToolTip(idx, "Visual Media & PDF Difference Studio (Curtain/Heatmap)")
         elif mode == "table":
             w = TabularDiffView()
             count = self._count_tabs(TabularDiffView)
             title = " Table & CSV" if count == 0 else f" Table Diff ({count + 1})"
-            idx = self.tabs.addTab(w, get_line_icon("table", "#1a7f37"), title)
+            idx = self.tabs.addTab(w, get_studio_badge_icon("table"), title)
             self.tabs.setTabToolTip(idx, "Tabular & Spreadsheet Keyed Grid Diff (CSV/TSV/Excel)")
         elif mode in ("structured", "contract"):
             w = StructuredDiffView(initial_mode=("contract" if mode == "contract" else "tree"))
             count = self._count_tabs(StructuredDiffView)
             if mode == "contract":
                 title = " API Contract" if count == 0 else f" API Contract ({count + 1})"
-                icon = get_line_icon("shield", "#0969da")
+                icon = get_studio_badge_icon("contract")
                 tip = "API Contract Breaking-Change Audit (OpenAPI / GraphQL / Protobuf)"
             else:
                 title = " Tree (JSON/XML)" if count == 0 else f" JSON/XML ({count + 1})"
-                icon = get_line_icon("code", "#cf222e")
+                icon = get_studio_badge_icon("structured")
                 tip = "Structured Data Hierarchical Tree Diff (JSON/YAML/XML)"
             idx = self.tabs.addTab(w, icon, title)
             self.tabs.setTabToolTip(idx, tip)
@@ -340,7 +339,7 @@ class MainWindow(QMainWindow):
             w = HexDiffView()
             count = self._count_tabs(HexDiffView)
             title = " Hex & Binary" if count == 0 else f" Hex Diff ({count + 1})"
-            idx = self.tabs.addTab(w, get_line_icon("cpu", "#57606a"), title)
+            idx = self.tabs.addTab(w, get_studio_badge_icon("hex"), title)
             self.tabs.setTabToolTip(idx, "Memory-Mapped Hexadecimal & Binary Inspector")
         else:
             return None
@@ -574,17 +573,17 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
 
         menu_session = menubar.addMenu("&Session")
-        menu_session.addAction(get_line_icon("sparkles", "#0969da"), "Home Screen").triggered.connect(self.show_home_tab)
+        menu_session.addAction(get_app_icon(), "Home Screen").triggered.connect(self.show_home_tab)
         menu_session.addSeparator()
-        menu_session.addAction(get_line_icon("diff", "#0969da"), "New 2-Way Text Diff").triggered.connect(lambda: self.add_new_tab("text"))
-        menu_session.addAction(get_line_icon("git-merge", "#1a7f37"), "New 3-Way Merge").triggered.connect(lambda: self.add_new_tab("merge"))
-        menu_session.addAction(get_line_icon("folder", "#0969da"), "New Folder Compare").triggered.connect(lambda: self.add_new_tab("folder"))
-        menu_session.addAction(get_line_icon("folder-merge", "#b45309"), "New 3-Way Folder Merge").triggered.connect(lambda: self.add_new_tab("folder_merge"))
-        menu_session.addAction(get_line_icon("image", "#8250df"), "New Image & PDF Diff").triggered.connect(lambda: self.add_new_tab("image"))
-        menu_session.addAction(get_line_icon("table", "#1a7f37"), "New Table & CSV Diff").triggered.connect(lambda: self.add_new_tab("table"))
-        menu_session.addAction(get_line_icon("code", "#cf222e"), "New Structured Tree Diff").triggered.connect(lambda: self.add_new_tab("structured"))
-        menu_session.addAction(get_line_icon("shield", "#0969da"), "New API Contract Audit").triggered.connect(lambda: self.add_new_tab("contract"))
-        menu_session.addAction(get_line_icon("cpu", "#57606a"), "New Hex & Binary Diff").triggered.connect(lambda: self.add_new_tab("hex"))
+        menu_session.addAction(get_studio_badge_icon("text"), "New 2-Way Text Diff").triggered.connect(lambda: self.add_new_tab("text"))
+        menu_session.addAction(get_studio_badge_icon("merge"), "New 3-Way Merge").triggered.connect(lambda: self.add_new_tab("merge"))
+        menu_session.addAction(get_studio_badge_icon("folder"), "New Folder Compare").triggered.connect(lambda: self.add_new_tab("folder"))
+        menu_session.addAction(get_studio_badge_icon("folder_merge"), "New 3-Way Folder Merge").triggered.connect(lambda: self.add_new_tab("folder_merge"))
+        menu_session.addAction(get_studio_badge_icon("image"), "New Image & PDF Diff").triggered.connect(lambda: self.add_new_tab("image"))
+        menu_session.addAction(get_studio_badge_icon("table"), "New Table & CSV Diff").triggered.connect(lambda: self.add_new_tab("table"))
+        menu_session.addAction(get_studio_badge_icon("structured"), "New Structured Tree Diff").triggered.connect(lambda: self.add_new_tab("structured"))
+        menu_session.addAction(get_studio_badge_icon("contract"), "New API Contract Audit").triggered.connect(lambda: self.add_new_tab("contract"))
+        menu_session.addAction(get_studio_badge_icon("hex"), "New Hex & Binary Diff").triggered.connect(lambda: self.add_new_tab("hex"))
         menu_session.addSeparator()
         menu_session.addAction(get_line_icon("folder", "#0969da"), "Workspace Profiles...").triggered.connect(self._open_profiles_dialog)
         menu_session.addAction("Exit").triggered.connect(self.close)

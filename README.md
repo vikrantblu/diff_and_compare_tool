@@ -1,6 +1,11 @@
-# diff_and_compare_tool — Next-Gen Diff & Merge Studio
-
-A high-performance, cross-platform file comparison, 3-way merge, and multi-format data synchronization desktop suite built with Python (PySide6) and modern Windows 11 Fluent design principles.
+<div align="center">
+  <img src="docs/assets/app_icon.png" alt="diff_and_compare_tool Logo" width="84" height="84" />
+  <h1>diff_and_compare_tool — Next-Gen Diff &amp; Merge Studio</h1>
+  <p>A high-performance, cross-platform file comparison, 3-way merge, and multi-format data synchronization desktop suite built with Python (PySide6) and modern Windows 11 Fluent Light design principles.</p>
+  <p>
+    <img src="docs/assets/hero_banner.png" alt="diff_and_compare_tool Fluent Light Hero Artwork" width="760" />
+  </p>
+</div>
 
 [![CI Test Suite](https://github.com/vikrantblu/diff_and_compare_tool/actions/workflows/test.yml/badge.svg)](https://github.com/vikrantblu/diff_and_compare_tool/actions/workflows/test.yml)
 [![CodeQL Analysis](https://github.com/vikrantblu/diff_and_compare_tool/actions/workflows/codeql.yml/badge.svg)](https://github.com/vikrantblu/diff_and_compare_tool/actions/workflows/codeql.yml)

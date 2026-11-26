@@ -47,14 +47,15 @@ QMainWindow, QDialog {
 QMenuBar {
     background-color: #ffffff;
     color: #0f172a;
-    border-bottom: 1px solid #e2e8f0;
-    padding: 2px 4px;
+    border-bottom: 1px solid #cbd5e1;
+    padding: 3px 6px;
 }
 
 QMenuBar::item {
-    padding: 4px 10px;
-    border-radius: 4px;
+    padding: 5px 11px;
+    border-radius: 6px;
     background: transparent;
+    font-weight: 500;
 }
 
 QMenuBar::item:selected {
@@ -253,8 +254,14 @@ QTreeWidget, QTreeView, QListWidget, QTableWidget, QTableView {
 }
 
 QTreeWidget::item, QTreeView::item, QTableWidget::item, QTableView::item {
-    padding: 4px;
+    padding: 5px 6px;
     border-bottom: 1px solid #f1f5f9;
+}
+
+QListWidget::item {
+    padding: 5px 8px;
+    border-radius: 5px;
+    margin: 1px 2px;
 }
 
 QTreeWidget::item:hover, QTreeView::item:hover, QListWidget::item:hover {

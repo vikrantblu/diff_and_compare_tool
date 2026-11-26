@@ -16,45 +16,58 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 
-from app.ui.styles.icons import get_line_icon, get_line_pixmap
+from app.ui.styles.icons import (
+    get_line_icon,
+    get_line_pixmap,
+    get_app_icon_pixmap,
+    get_studio_badge_pixmap,
+)
 from app.core.shell_integration import get_left_path, set_left_path, clear_state
 from app.core.session_manager import SessionManager
 
 
 class SessionCard(QFrame):
-    """Clean, high-resolution session icon card."""
+    """Fluent Light studio card with duotone badge, title, and capability subtitle."""
 
     clicked = Signal(str)
 
-    def __init__(self, mode_id: str, title: str, icon_name: str, icon_color: str, parent=None):
+    def __init__(
+        self,
+        mode_id: str,
+        title: str,
+        icon_name: str,
+        icon_color: str,
+        parent=None,
+        subtitle: str = "",
+    ):
         super().__init__(parent)
         self.mode_id = mode_id
         self.setObjectName("SessionCard")
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedSize(132, 126)
+        self.setFixedSize(152, 142)
 
         self.setStyleSheet("""
             QFrame#SessionCard {
                 background: #ffffff;
                 border: 1px solid #cbd5e1;
+                border-bottom: 2px solid #cbd5e1;
                 border-radius: 12px;
             }
             QFrame#SessionCard:hover {
                 background: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #eff6ff);
-                border: 1.5px solid qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #0969da, stop:0.35 #60a5fa, stop:0.7 #a855f7, stop:1 #0969da);
+                border: 1.5px solid #2563eb;
             }
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 12, 10, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(10, 12, 10, 10)
+        layout.setSpacing(6)
         layout.setAlignment(Qt.AlignCenter)
 
         lbl_icon = QLabel()
         lbl_icon.setAlignment(Qt.AlignCenter)
         lbl_icon.setStyleSheet("background: transparent; border: none; padding: 0px;")
-        lbl_icon.setPixmap(get_line_pixmap(icon_name, icon_color, size=48))
+        lbl_icon.setPixmap(get_studio_badge_pixmap(mode_id, size=48))
         layout.addWidget(lbl_icon)
 
         lbl_title = QLabel(title)
@@ -64,13 +77,21 @@ class SessionCard(QFrame):
             QLabel {
                 font-weight: 700;
                 font-size: 12px;
-                color: #1e293b;
+                color: #0f172a;
                 background: transparent;
                 border: none;
                 padding: 0px;
             }
         """)
         layout.addWidget(lbl_title)
+
+        if subtitle:
+            lbl_sub = QLabel(subtitle)
+            lbl_sub.setAlignment(Qt.AlignCenter)
+            lbl_sub.setStyleSheet(
+                "font-size: 10px; font-weight: 500; color: #64748b; background: transparent; border: none;"
+            )
+            layout.addWidget(lbl_sub)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -84,6 +105,14 @@ class HomeView(QWidget):
     compareFilesRequested = Signal(str, str)               # (left_path, right_path)
     clipboardCompareRequested = Signal()
     gitChangesRequested = Signal()
+    remoteProfilesRequested = Signal()
+
+    _DROP_HINT_DEFAULT_QSS = (
+        "QFrame#DropHintFrame { background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 10px; padding: 4px 12px; }"
+    )
+    _DROP_HINT_ACTIVE_QSS = (
+        "QFrame#DropHintFrame { background: #eff6ff; border: 2px dashed #0969da; border-radius: 10px; padding: 4px 12px; }"
+    )
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -92,23 +121,83 @@ class HomeView(QWidget):
 
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(40, 34, 40, 24)
-        main_layout.setSpacing(18)
+        main_layout.setContentsMargins(36, 22, 36, 18)
+        main_layout.setSpacing(14)
         main_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
 
-        # 1. Clean Centered Prompt
-        prompt_box = QWidget()
-        p_layout = QVBoxLayout(prompt_box)
-        p_layout.setContentsMargins(0, 0, 0, 0)
-        p_layout.setSpacing(6)
-        p_layout.setAlignment(Qt.AlignCenter)
+        # 1. Branded Studio Header Card
+        hero_card = QFrame()
+        hero_card.setObjectName("HomeHeroCard")
+        hero_card.setMaximumWidth(816)
+        hero_card.setStyleSheet("""
+            QFrame#HomeHeroCard {
+                background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #ffffff, stop:0.65 #f8fafc, stop:1 #eff6ff);
+                border: 1px solid #cbd5e1;
+                border-radius: 14px;
+            }
+        """)
+        hero_layout = QHBoxLayout(hero_card)
+        hero_layout.setContentsMargins(18, 14, 18, 14)
+        hero_layout.setSpacing(16)
 
-        lbl_prompt = QLabel("Drag folders or files here\nor click a session icon to begin:")
+        lbl_logo = QLabel()
+        lbl_logo.setFixedSize(56, 56)
+        lbl_logo.setAlignment(Qt.AlignCenter)
+        lbl_logo.setStyleSheet("background: transparent; border: none;")
+        lbl_logo.setPixmap(get_app_icon_pixmap(56))
+        hero_layout.addWidget(lbl_logo)
+
+        title_col = QVBoxLayout()
+        title_col.setContentsMargins(0, 0, 0, 0)
+        title_col.setSpacing(3)
+
+        lbl_brand = QLabel("Diff & Compare Studio")
+        lbl_brand.setStyleSheet(
+            "font-size: 19px; font-weight: 800; color: #0f172a; background: transparent; border: none;"
+        )
+        title_col.addWidget(lbl_brand)
+
+        lbl_tagline = QLabel("Multi-Format Diff, 3-Way Merge, Folder Sync & Remote VFS Workbench")
+        lbl_tagline.setStyleSheet(
+            "font-size: 12px; font-weight: 500; color: #475569; background: transparent; border: none;"
+        )
+        title_col.addWidget(lbl_tagline)
+
+        pills_row = QHBoxLayout()
+        pills_row.setContentsMargins(0, 4, 0, 0)
+        pills_row.setSpacing(6)
+        for badge_txt, bg, fg, bd in [
+            ("Fluent Light", "#eff6ff", "#0969da", "#bfdbfe"),
+            ("10 Studios", "#f0fdf4", "#15803d", "#bbf7d0"),
+            ("SFTP · S3 · FTP", "#ecfeff", "#0e7490", "#a5f3fc"),
+            ("Command Palette Ctrl+K", "#f8fafc", "#334155", "#cbd5e1"),
+        ]:
+            pill = QLabel(badge_txt)
+            pill.setStyleSheet(
+                f"background: {bg}; color: {fg}; border: 1px solid {bd}; "
+                f"border-radius: 9px; padding: 2px 8px; font-size: 10.5px; font-weight: 600;"
+            )
+            pills_row.addWidget(pill)
+        pills_row.addStretch()
+        title_col.addLayout(pills_row)
+        hero_layout.addLayout(title_col, 1)
+
+        main_layout.addWidget(hero_card, 0, Qt.AlignHCenter)
+
+        # Interactive Drag & Drop Cue Strip
+        self.drop_hint_frame = QFrame()
+        self.drop_hint_frame.setObjectName("DropHintFrame")
+        self.drop_hint_frame.setMaximumWidth(816)
+        self.drop_hint_frame.setStyleSheet(self._DROP_HINT_DEFAULT_QSS)
+        dh_layout = QHBoxLayout(self.drop_hint_frame)
+        dh_layout.setContentsMargins(12, 6, 12, 6)
+        dh_layout.setAlignment(Qt.AlignCenter)
+        lbl_prompt = QLabel("Drag folders or files anywhere here to compare immediately, or choose a studio below:")
         lbl_prompt.setAlignment(Qt.AlignCenter)
-        lbl_prompt.setStyleSheet("font-size: 16px; font-weight: 600; color: #1e293b; border: none; background: transparent;")
-        p_layout.addWidget(lbl_prompt)
-
-        main_layout.addWidget(prompt_box)
+        lbl_prompt.setStyleSheet("font-size: 12.5px; font-weight: 600; color: #334155; border: none; background: transparent;")
+        dh_layout.addWidget(lbl_prompt)
+        main_layout.addWidget(self.drop_hint_frame, 0, Qt.AlignHCenter)
 
         # 2. Row 1: Primary Sessions (5 cards)
         row1_widget = QWidget()
@@ -118,15 +207,15 @@ class HomeView(QWidget):
         row1_layout.setAlignment(Qt.AlignCenter)
 
         primary_sessions = [
-            ("folder", "Folder Compare", "folder-compare", "#d97706"),
-            ("folder_merge", "Folder Merge", "folder-merge", "#b45309"),
-            ("folder_sync", "Folder Sync", "folder-sync", "#059669"),
-            ("text", "Text Compare", "text-compare", "#0969da"),
-            ("merge", "Text Merge", "text-merge", "#16a34a"),
+            ("folder", "Folder Compare", "folder-compare", "#d97706", "2-Way · ZIP · Remote"),
+            ("folder_merge", "Folder Merge", "folder-merge", "#b45309", "3-Way Ancestor"),
+            ("folder_sync", "Folder Sync", "folder-sync", "#059669", "Mirror & Bi-Dir"),
+            ("text", "Text Compare", "text-compare", "#0969da", "Myers · AST · DOCX"),
+            ("merge", "Text Merge", "text-merge", "#16a34a", "3-Way Conflicts"),
         ]
 
-        for mode_id, title, icon_name, icon_color in primary_sessions:
-            card = SessionCard(mode_id, title, icon_name, icon_color)
+        for mode_id, title, icon_name, icon_color, subtitle in primary_sessions:
+            card = SessionCard(mode_id, title, icon_name, icon_color, subtitle=subtitle)
             card.clicked.connect(self._on_card_clicked)
             row1_layout.addWidget(card)
 
@@ -140,35 +229,41 @@ class HomeView(QWidget):
         row2_layout.setAlignment(Qt.AlignCenter)
 
         secondary_sessions = [
-            ("table", "Table / CSV\nCompare", "table", "#0891b2"),
-            ("structured", "JSON / YAML\nXML Tree", "code", "#cf222e"),
-            ("contract", "API Contract\nAudit", "shield", "#0969da"),
-            ("image", "Image & PDF\nDiff Studio", "image", "#7c3aed"),
-            ("hex", "Hex & Binary\nDiff", "cpu", "#475569"),
+            ("table", "Table / CSV\nCompare", "table", "#0891b2", "CSV · Excel · Parquet"),
+            ("structured", "JSON / YAML\nXML Tree", "code", "#cf222e", "JSONPath · XPath"),
+            ("contract", "API Contract\nAudit", "shield", "#0969da", "OpenAPI · GraphQL"),
+            ("image", "Image & PDF\nDiff Studio", "image", "#7c3aed", "RGBA · PDF Overlay"),
+            ("hex", "Hex & Binary\nDiff", "cpu", "#475569", "Virtual Multi-GB"),
         ]
 
-        for mode_id, title, icon_name, icon_color in secondary_sessions:
-            card = SessionCard(mode_id, title, icon_name, icon_color)
+        for mode_id, title, icon_name, icon_color, subtitle in secondary_sessions:
+            card = SessionCard(mode_id, title, icon_name, icon_color, subtitle=subtitle)
             card.clicked.connect(self._on_card_clicked)
             row2_layout.addWidget(card)
 
         main_layout.addWidget(row2_widget)
 
-        # Quick Actions: Compare Clipboard & Git Working Changes
+        # Quick Actions: Compare Clipboard, Git Working Changes & Remote Profiles
         qa_row = QHBoxLayout()
         qa_row.setAlignment(Qt.AlignCenter)
         qa_row.setSpacing(10)
         self.btn_compare_clipboard = QPushButton(" Compare Clipboard vs Text Studio")
         self.btn_compare_clipboard.setIcon(get_line_icon("clipboard", "#0969da"))
-        self.btn_compare_clipboard.setFixedHeight(30)
+        self.btn_compare_clipboard.setFixedHeight(32)
         self.btn_compare_clipboard.clicked.connect(self.clipboardCompareRequested.emit)
         qa_row.addWidget(self.btn_compare_clipboard)
 
         self.btn_git_changes = QPushButton(" Browse Git Changes (Ctrl+G)")
         self.btn_git_changes.setIcon(get_line_icon("git-branch", "#1a7f37"))
-        self.btn_git_changes.setFixedHeight(30)
+        self.btn_git_changes.setFixedHeight(32)
         self.btn_git_changes.clicked.connect(self.gitChangesRequested.emit)
         qa_row.addWidget(self.btn_git_changes)
+
+        self.btn_remote_profiles = QPushButton(" Remote Profiles (SFTP/S3/FTP)")
+        self.btn_remote_profiles.setIcon(get_line_icon("globe", "#0891b2"))
+        self.btn_remote_profiles.setFixedHeight(32)
+        self.btn_remote_profiles.clicked.connect(self.remoteProfilesRequested.emit)
+        qa_row.addWidget(self.btn_remote_profiles)
         main_layout.addLayout(qa_row)
 
         # 4. Staged Left Target Pill (shown only when a Left target is staged)
@@ -199,13 +294,13 @@ class HomeView(QWidget):
 
         # 5. Recent Comparisons Panel
         self.recent_frame = QFrame()
-        self.recent_frame.setMaximumWidth(720)
+        self.recent_frame.setMaximumWidth(816)
         self.recent_frame.setStyleSheet("""
             QFrame {
                 background-color: #f8fafc;
                 border: 1px solid #cbd5e1;
-                border-radius: 10px;
-                padding: 8px 12px;
+                border-radius: 12px;
+                padding: 8px 14px;
             }
         """)
         rf_layout = QVBoxLayout(self.recent_frame)
@@ -225,7 +320,7 @@ class HomeView(QWidget):
         rf_layout.addLayout(rf_head)
 
         self.list_recent = QListWidget()
-        self.list_recent.setMaximumHeight(130)
+        self.list_recent.setMaximumHeight(124)
         self.list_recent.itemDoubleClicked.connect(self._on_recent_clicked)
         rf_layout.addWidget(self.list_recent)
 
@@ -244,12 +339,13 @@ class HomeView(QWidget):
 
         self.list_recent.clear()
         recents = SessionManager.get_recent_comparisons(limit=8)
+        diff_icon = get_line_icon("diff", "#0969da", size=14)
         for rec in recents:
             lp = rec.get("left_path", "")
             rp = rec.get("right_path", "")
             if lp and rp:
                 label = f"{os.path.basename(lp)}  ↔  {os.path.basename(rp)}   ({lp}  |  {rp})"
-                item = QListWidgetItem(label)
+                item = QListWidgetItem(diff_icon, label)
                 item.setData(Qt.UserRole, (lp, rp))
                 self.list_recent.addItem(item)
         self.recent_frame.setVisible(self.list_recent.count() > 0)
@@ -272,9 +368,15 @@ class HomeView(QWidget):
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
+            self.drop_hint_frame.setStyleSheet(self._DROP_HINT_ACTIVE_QSS)
             event.acceptProposedAction()
 
+    def dragLeaveEvent(self, event):
+        self.drop_hint_frame.setStyleSheet(self._DROP_HINT_DEFAULT_QSS)
+        super().dragLeaveEvent(event)
+
     def dropEvent(self, event: QDropEvent):
+        self.drop_hint_frame.setStyleSheet(self._DROP_HINT_DEFAULT_QSS)
         urls = event.mimeData().urls()
         paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
         if not paths:

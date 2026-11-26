@@ -115,6 +115,56 @@ def get_line_pixmap(name: str, color: str = "#24292f", size: int = 48) -> QPixma
     return pixmap
 
 
+STUDIO_BADGE_THEMES = {
+    "folder": ("folder-compare", "#b45309", "#fffbeb", "#fef3c7", "#fcd34d"),
+    "folder_merge": ("folder-merge", "#c2410c", "#fff7ed", "#ffedd5", "#fdba74"),
+    "folder_sync": ("folder-sync", "#047857", "#ecfdf5", "#d1fae5", "#6ee7b7"),
+    "text": ("text-compare", "#0969da", "#eff6ff", "#dbeafe", "#93c5fd"),
+    "merge": ("text-merge", "#15803d", "#f0fdf4", "#dcfce7", "#86efac"),
+    "table": ("table", "#0e7490", "#ecfeff", "#cffafe", "#67e8f9"),
+    "structured": ("code", "#be123c", "#fff1f2", "#ffe4e6", "#fda4af"),
+    "contract": ("shield", "#1d4ed8", "#eef2ff", "#e0e7ff", "#a5b4fc"),
+    "image": ("image", "#7c3aed", "#f5f3ff", "#ede9fe", "#c4b5fd"),
+    "hex": ("cpu", "#334155", "#f8fafc", "#e2e8f0", "#cbd5e1"),
+}
+
+
+def get_studio_badge_pixmap(mode_id: str, size: int = 52) -> QPixmap:
+    """Renders a Fluent Light duotone rounded-squircle badge for a studio mode."""
+    icon_name, stroke_color, bg_top, bg_bottom, border_color = STUDIO_BADGE_THEMES.get(
+        mode_id,
+        ("diff", "#0969da", "#eff6ff", "#dbeafe", "#93c5fd"),
+    )
+    inner = SVG_ICONS.get(icon_name, SVG_ICONS["file-text"])
+    grad_id = f"badgeGrad_{mode_id}"
+    svg_template = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 40 40">'
+        f'<defs><linearGradient id="{grad_id}" x1="0%" y1="0%" x2="0%" y2="100%">'
+        f'<stop offset="0%" stop-color="{bg_top}"/><stop offset="100%" stop-color="{bg_bottom}"/>'
+        f'</linearGradient></defs>'
+        f'<rect x="1" y="1" width="38" height="38" rx="10" ry="10" '
+        f'fill="url(#{grad_id})" stroke="{border_color}" stroke-width="1.25"/>'
+        f'<g transform="translate(8,8)" fill="none" stroke="{stroke_color}" '
+        f'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">{inner}</g>'
+        f'</svg>'
+    )
+
+    renderer = QSvgRenderer(QByteArray(svg_template.encode("utf-8")))
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    renderer.render(painter)
+    painter.end()
+    return pixmap
+
+
+def get_studio_badge_icon(mode_id: str, size: int = 20) -> QIcon:
+    """Returns a QIcon wrapping the Fluent Light duotone badge for tabs and menus."""
+    return QIcon(get_studio_badge_pixmap(mode_id, size=size))
+
+
 def _find_asset(filename: str) -> str:
     """Resolves an asset inside assets/ across source tree and frozen PyInstaller bundles."""
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
