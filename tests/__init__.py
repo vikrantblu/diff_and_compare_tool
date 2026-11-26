@@ -6,10 +6,14 @@ import sys
 
 
 def _cleanup_qt_on_exit() -> None:
-    """Cleanly dispose Qt top-level widgets and pixmap caches before Python finalization."""
+    """Cleanly dispose Qt widgets/app on Windows CI before Python finalization."""
+    if sys.platform != "win32":
+        return
+
     try:
         from PySide6.QtGui import QPixmapCache
         from PySide6.QtWidgets import QApplication
+        import shiboken6
 
         app = QApplication.instance()
         if app is None:
@@ -29,13 +33,7 @@ def _cleanup_qt_on_exit() -> None:
         QApplication.sendPostedEvents(None, 0)
         QApplication.processEvents()
         app.quit()
-
-        # On Windows CI under PySide6 6.11 offscreen, explicitly deleting QApplication
-        # before Py_FinalizeEx avoids an exit-code-1 teardown race; on Linux offscreen,
-        # deleting QApplication here triggers a pure-virtual abort in libqoffscreen.
-        if sys.platform == "win32":
-            import shiboken6
-            shiboken6.delete(app)
+        shiboken6.delete(app)
     except Exception:
         pass
 
