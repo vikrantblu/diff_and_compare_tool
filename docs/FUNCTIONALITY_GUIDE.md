@@ -8,14 +8,15 @@
 
 | Module | Core Functionality | Highlights |
 | :--- | :--- | :--- |
-| **2-Way File Diff** | Side-by-side text & code comparison | **Tree-sitter AST Semantic Diffing**, **View Virtualization for 100k+ lines**, **Diff Minimap & 16px Overview Ruler**, **Native BLAKE3 PyO3 Hashing**, **In-line Buffer Swap (`Ctrl+U`)**, **Live Visual Git Chunk Staging (`git apply --cached`)**, Myers line diff + DMP intraline, Beyond Compare spacers, **Moved Blocks**, **Noise filters**, **Patch export**, and **AI PR summaries**. |
-| **3-Way Merge Studio** | 3-way ancestor-based merge | Mine vs Base vs Theirs alignment, conflict detection, **Collapsible 4th Merge Output Preview Pane**, resolution ribbon (`Accept Mine`, `Accept Theirs`, `Accept Base`, `Take Both`), and **AI Conflict Resolver**. |
-| **Directory & Archive Compare** | Folder and archive synchronization | **Interactive Folder Sync Hub (`🔄 Sync Hub...`)** (Mirror, Bi-directional, Update), **Smart `.gitignore` & exclusion rules**, **Adaptive Batch Throttling (250 items/50ms)**, BLAKE3/SHA-256 hash validation, and **Virtual Archive VFS** (browsing `.zip`, `.jar`, `.tar` without decompression). |
-| **Visual Media & Document Diff** | Image & PDF comparison studio | **Multi-Page PDF Comparison (`fitz`)**, **Extracted Text Diff View**, **Photographic EXIF & Metadata Table**, **SVG Vector Rendering**, **Swipe Curtain slider**, **Onion-Skin transparency**, **Difference Heatmap**, and **Flicker/Blink mode**. |
-| **Tabular / Spreadsheet Diff** | CSV, TSV, Excel, Parquet, SQLite | **Float Tolerance (`Float Tol:`)**, **Streaming Apache Parquet (`*.parquet`, 5000-row chunks)**, **Streaming SQLite (`*.db`, `*.sqlite`)**, **Keyed Row Alignment** (Primary Key selector), cell mutation tooltips, and synchronized dual grids. |
-| **Structured Tree Diff** | JSON, YAML, and XML tree comparison | **JSONPath & XPath Query Bar**, **Semantic Unordered Array Matching**, hierarchical node comparison, **Key Sorting**, and diffs-only filter. |
-| **Hex & Binary Diff** | Memory-mapped binary inspector | 16-byte chunking, offset, hexadecimal, ASCII views, **mmap streaming for multi-GB files**, and Next/Prev diff seeking. |
-| **Headless CI/CD Automation** | Non-GUI batch diffing & reporting | `--folder-diff`, `--diff`, `--report-html`, `--exit-code` (0 = identical, 1 = mismatch, 2 = error). **CLI Stdin Diffing (`--diff - <file>`)**. Standalone responsive HTML reports. |
+| **2-Way File Diff** | Side-by-side text, code & `.docx` | **Synchronized Bottom Line Details**, **Display Scope Filters** (`All Lines`, `Diffs Only`, `Context ±3`, `Same Only`), **Read-Only Pane Lock**, **Interactive Encoding/EOL Converter**, **External File Watcher (`QFileSystemWatcher`)**, **Side-by-Side HTML Report Export**, Tree-sitter AST Semantic Diffing, 100k+ line virtualization, custom regex unimportant rules, and Git hunk staging. |
+| **3-Way Merge Studio** | 3-way ancestor-based merge | Mine vs Base vs Theirs alignment, standard diff3 markers, collapsible Output Preview pane, resolution Undo stack, `Accept Mine/Theirs/Base/Both`, CLI `--output` honoring, and **AI Conflict Resolver**. |
+| **Directory & Archive Compare** | Folder & archive synchronization | **Flatten Folders Toggle**, **Size & Timestamp (±2s) tolerance**, **HTML & CSV Report Export**, **Interactive Sync Hub** (per-row checkboxes + Recycle Bin safe delete), live status count pills, `.gitignore` pruning, BLAKE3/SHA-256, and Virtual Archive VFS. |
+| **Visual Media & Document Diff** | Image, PDF & SVG studio | **Live (X, Y) RGBA Pixel Delta Inspector**, interactive Zoom (`Fit` / `100%` / `Ctrl+Wheel`), Multi-Page PDF comparison (`fitz`), aligned extracted text diff, EXIF metadata table, Swipe Curtain, Onion-Skin, Vectorized Heatmap, and Flicker mode. |
+| **Tabular / Spreadsheet Diff** | CSV, TSV, Excel, Parquet, SQLite | Sheet & SQLite table selectors, Float Tolerance, duplicate-key reporting, Keyed Row Alignment, Export Diff CSV, and synchronized grids. |
+| **Structured Tree & API Contract** | JSON, YAML, XML & API contracts | JSONPath & XPath query bar, Semantic Unordered Arrays, recursive search, XML tag rename detection, and **OpenAPI / GraphQL / Protobuf Breaking-Change Audit**. |
+| **Hex & Binary Diff** | Virtualized `QTableView` MMF inspector | Paged LRU byte model for multi-GB files, per-byte delta delegate, Go-to-Offset, Find Hex/ASCII pattern, and 8/16/32/64-bit Live Data Inspector. |
+| **Headless CI/CD & CLI** | Non-GUI batch diffing & reporting | `--folder-diff`, `--diff`, `--contract-diff`, `--report-html`, `--report-json`, `--exit-code` (`0/1/2`), and **CLI Stdin Diffing (`--diff - <file>`)**. |
+| **Command Palette & Git Browser** | Keyboard-first productivity | **Command Palette (`Ctrl+K`)**, **Git Working-Tree Changes Browser (`Ctrl+G`)** opening `HEAD vs Working Copy`, and 1-click Git Difftool/Mergetool setup. |
 | **Single-Instance IPC & Shell** | Desktop tab remoting & Win11 shell | **Windows Named Pipes (`QLocalServer`/`QLocalSocket`)** routing Explorer/CLI files into active window tabs without launching new processes. Explorer context menu ("Compare with diff_and_compare_tool", "diff_and_compare_tool: Select Left", "diff_and_compare_tool: Select Right"). |
 | **Write-Ahead Log (WAL)** | Zero-data-loss crash recovery | **Append-only JSONL transaction journal (`%APPDATA%/diff_and_compare/wal/`)** persisting live keystrokes and buffer states. Automatic crash recovery prompt on startup. |
 | **Local-First AI & Privacy** | AI assistance with zero leakage | **Automated Secret & PII Scrubber** (redacts AWS keys, tokens, JWTs, passwords), local Ollama models (**`qwen2.5-coder`**, `deepseek-coder`, `codellama`), and `🛡️ Privacy Shield`. |
@@ -40,11 +41,20 @@
 - **Clean File Saving**: The save engine automatically strips visual spacer lines via `get_clean_text()`, ensuring saved files on disk are 100% clean.
 - **Aligned View Toggle**: You can toggle the "Aligned View (Spacers)" checkbox on the toolbar to switch between aligned spacer mode and raw unpadded mode at any time.
 - **Manual Alignment ("Align With...")**:
-  - Right-click any line on either the Left or Right editor and select **📌 Align With... (Line X)**, or position the cursor and press **`F7`**.
+  - Right-click any line on either the Left or Right editor and select **📌 Align With... (Line X)**, or position the cursor and press **`Ctrl+Shift+A`**.
   - An interactive banner appears: *"Click a line in the Right/Left editor to align with Line X... [Cancel (Esc)]"*.
   - Click the matching target line on the opposing editor. The engine immediately locks both lines to the identical horizontal display row, computing optimal spacer padding above the anchor.
-  - Active manual alignments are tracked in the command bar with a status pill: `📌 1 Manual Alignment [✕]`.
+  - Active manual alignments are tracked in the command bar with a status pill: `1 Alignment [✕]`.
   - To clear alignments, click the `[✕]` pill button or press **`Ctrl+F7`**.
+- **Synchronized Bottom Line Details Pane**:
+  - Tracks your active cursor row in either editor and stacks Left vs Right side-by-side vertically with character-by-character intraline diff highlighting and exact character-delta readout. Toggle anytime via **Line Details** in the options strip.
+- **Display Scope Filtering**:
+  - Filter the view using the **All Lines / Diffs Only / Context ±3 / Same Only** dropdown without losing accurate 1-based line numbers.
+- **Read-Only Lock, Encoding/EOL Converter & Word `.docx`**:
+  - Click the padlock button in either pane header to protect baseline files against edits or hunk transfers (automatically enabled when extracting Microsoft Word `.docx` text & tables).
+  - Click the **`UTF-8 | LF`** pill button in either pane header to convert encoding (`UTF-8`, `UTF-8 BOM`, `UTF-16 LE`, `UTF-16 BE`, `Windows-1252`) or line endings (`LF`, `CRLF`, `CR`) for saving.
+- **External File Modification Watcher**:
+  - Automatically monitors opened files via `QFileSystemWatcher` and shows a non-blocking **[Reload File] [Dismiss]** banner when another editor or Git command updates the file on disk.
 - **Resilient Section & Sub-Block Realignment**:
   - When comparing documents with inserted or renumbered sections (e.g., Markdown headings such as `### 8.2 IPC Tab Remoting` vs `### 8.3 Git Staging`), standard line-matching can cascade mismatches down the file.
   - The engine automatically applies **Needleman-Wunsch dynamic programming** within modification chunks paired with **heading section number normalization** (`strip_section_number`).
@@ -265,9 +275,8 @@ python app/main.py --diff file_a.py file_b.py --report-html diff_report.html --e
 
 ## 8. Native Windows 11 & Shell Integration
 
-### 8.1 Windows 11 DWM Mica Alt Backdrop
-- Utilizes `ctypes.windll.dwmapi` to activate native Windows 11 Mica Alt (`DWMWA_SYSTEMBACKDROP_TYPE = 4`) and rounded corners (`DWMWCP_ROUND`).
-- Dynamically responds to theme switching, matching Windows 11 Fluent dark and light aesthetics.
+### 8.1 Windows 11 DWM Mica Alt Light Backdrop
+- Utilizes `ctypes.windll.dwmapi` to activate native Windows 11 Mica Alt (`DWMWA_SYSTEMBACKDROP_TYPE = 4`) and rounded corners (`DWMWCP_ROUND`) tuned specifically for crisp **White / Fluent Light Mode**.
 
 ### 8.2 Dynamic Multi-Session Tab Lifecycle & Home Launcher
 - **Clean Beyond Compare Launch Experience**: The application starts cleanly with only the signature **Home** launcher dashboard displayed by default, eliminating visual clutter from pre-opened blank comparison tabs.
@@ -342,17 +351,22 @@ git config --global mergetool.diff_and_compare.cmd "diff_and_compare.exe --merge
 
 | Shortcut | Scope | Action |
 | :--- | :--- | :--- |
+| `Ctrl+K` / `Ctrl+Shift+P` | Global | Open Command Palette (jump to studios, actions, & recents) |
+| `Ctrl+G` | Global | Browse Git Working-Tree Changes (open `HEAD vs Working Copy`) |
+| `Ctrl+W` | Global | Close active studio tab (Home stays pinned) |
 | `Ctrl+U` | 2-Way Diff | Swap Left and Right Editor Buffers in-place |
 | `F7` | 2-Way Diff / Hex | Jump to Previous Difference |
 | `F8` | 2-Way Diff / Hex | Jump to Next Difference |
-| `Ctrl+Z` | 2-Way Diff / Editor | Undo edit or accepted hunk transfer |
+| `Ctrl+Shift+A` / `Ctrl+F7` | 2-Way Diff | Manual "Align With..." Anchor / Clear Alignments |
+| `Ctrl+Z` | 2-Way Diff / Merge | Undo edit, hunk transfer, or conflict resolution |
 | `Ctrl+Y` / `Ctrl+Shift+Z` | 2-Way Diff / Editor | Redo edit or hunk transfer |
 | `Ctrl+F` | Folders / VFS | Focus Explorer Search text box (real-time tree filter) |
-| `Ctrl+F` | 2-Way Diff | Open in-editor Find bar (docked live search) |
+| `Ctrl+F` / `Ctrl+H` | 2-Way Diff | Open docked Find & Replace bar (Regex + Case + Replace All) |
 | `F3` / `Enter` | 2-Way Diff | Find Next occurrence in diff editors |
 | `Shift+F3` / `Shift+Enter` | 2-Way Diff | Find Previous occurrence in diff editors |
-| `Esc` | Diff / Folders | Close Find bar or clear Explorer search |
-| `Ctrl+S` | Editor | Save active file buffer |
+| `Ctrl++` / `Ctrl+-` / `Ctrl+0` | 2-Way Diff / Image | Zoom In / Zoom Out / Reset Zoom |
+| `Esc` | Diff / Folders | Close Find bar, Alignment banner, or clear Explorer search |
+| `Ctrl+S` | Editor / Merge | Save active buffer (honors encoding/EOL or `--output`) |
 | `Ctrl+A` | Editor | Select all text |
 | `Alt+Up` | 3-Way Merge | Jump to Previous Conflict |
 | `Alt+Down` | 3-Way Merge | Jump to Next Conflict |

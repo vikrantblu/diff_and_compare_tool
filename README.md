@@ -14,98 +14,57 @@ A high-performance, cross-platform file comparison, 3-way merge, and multi-forma
 
 ---
 
-## 🌟 8 Multi-Format Comparison Studios & Automation Suite
+## 🌟 10 Multi-Format Comparison Studios & Automation Suite
 
-1. **⇄ 2-Way Text & Code Diff**:
+> 🌐 **Product Website & Interactive Guide**: Open [docs/index.html](docs/index.html) (or publish `/docs` on GitHub Pages) for an interactive Fluent Light overview, commercial feature comparison, and CLI reference.
+
+1. **⇄ 2-Way Text, Code & Word (`.docx`) Diff**:
+   - **Synchronized Bottom Line Details Pane**: Stacked Left vs Right character-by-character intraline inspector for the active cursor row.
+   - **Display Scope Filtering**: Switch between `All Lines`, `Diffs Only`, `Context ±3`, and `Same Only` with collapsible hidden-line markers while keeping true 1-based line numbers intact.
+   - **Read-Only Pane Lock & Interactive Encoding/EOL Converter**: Lock baseline files against accidental edits or hunk transfers; click the `UTF-8 | LF` pill to convert encoding (`UTF-8`, `UTF-8 BOM`, `UTF-16 LE/BE`, `Windows-1252`) or line endings (`LF`, `CRLF`, `CR`).
+   - **Word `.docx` Text & Table Extraction**: Open Microsoft Word `.docx` files directly side-by-side (auto-locked read-only) without requiring Microsoft Word.
+   - **External File Watcher**: Non-blocking reload banner notifies you immediately if an external editor, formatter, or Git command modifies an open file on disk.
    - **Tree-sitter AST Semantic Diffing**: Structural diffing for Python and JavaScript/TypeScript that detects reordered functions and docstring updates without false-positive line diffs.
-   - **View Virtualization for 100k+ Lines**: Windowed sliding-window rendering keeps memory footprint at $O(\text{window})$ ($\approx 50\text{ KB}$), rendering massive files with zero UI latency.
-   - **Diff Minimap & Visual Overview Ruler**: 16px navigation gutter displaying color-coded tick marks (green additions, red deletions, yellow modifications, orange conflicts, purple moves) with hover tooltips and click-to-jump line navigation.
-   - **Native Rust/C++ Acceleration (BLAKE3 PyO3)**: Hardware-accelerated 64-character BLAKE3 hashing with memory-mapped (`mmap`) streaming for multi-megabyte source files.
-   - **Live In-Line Buffer Swap (`Ctrl+U`)**: Instantly swaps left and right editor buffers in-place without file reloads or resetting cursor position.
-   - Myers line diff + `diff_match_patch` intraline character-level precision.
-   - **Moved Block Detection**: Identifies relocated functions/code with purple (`#8250df`) highlights.
-   - **Noise & Regex Filtering**: Filter timestamps, GUIDs, commit hashes, memory addresses, and comments.
-   - **Unified Patch Export**: One-click POSIX / Git `.patch` file export.
-   - **Manual Alignment ("Align With...")**: Explicitly anchor matching lines across panes by right-clicking and selecting **Align With...** (or pressing `F7`), then clicking the target line on the opposing editor. The engine pins both lines to the exact same display row with clean vertical spacer padding (`·`). Click the HUD pill button (`📌 X Manual Alignments [✕]`) or press `Ctrl+F7` to clear.
-   - **Resilient Section & Sub-Block Realignment**: Needleman-Wunsch dynamic programming sub-block alignment (`align_replace_block`) with markdown/heading section number normalization (`strip_section_number`) eliminates cascading alignment shifts caused by inserted or renumbered sections.
-   - **Local-First AI PR Summary & Privacy Shield**: Automated Markdown pull request summaries with strict automated credential and PII scrubbing prior to AI ingestion.
+   - **View Virtualization for 100k+ Lines**: Windowed sliding-window rendering keeps memory footprint bounded, rendering massive files smoothly.
+   - **Diff Minimap & Visual Overview Ruler**: 16px navigation gutter displaying color-coded tick marks (green additions, red deletions, blue modifications, orange conflicts, purple moves) with hover tooltips and click-to-jump navigation.
+   - **Custom Unimportant Difference Rules & Presets**: Define and persist custom regex substitution rules in Noise Filters alongside timestamps, GUIDs, commit hashes, and comments, and toggle `Ignore Unimportant` in one click.
+   - **Side-by-Side HTML Reports & Unified `.patch`**: Export Fluent Light interactive Side-by-Side HTML reports, `.patch` files, or copy unified diff directly to clipboard.
+   - **Manual Alignment ("Align With...")**: Explicitly anchor matching lines across panes by right-clicking and selecting **Align With...** (or pressing `Ctrl+Shift+A`), then clicking the target line on the opposing editor. Press `Ctrl+F7` or click the alignments pill to clear.
+   - **Find & Replace Bar**: Docked search (`Ctrl+F` / `Ctrl+H`) with Case Sensitivity (`Aa`), Regex (`.*`), and Replace / Replace All.
+   - **Local-First AI PR Summary & Privacy Shield**: Automated Markdown pull request summaries (local Ollama or OpenAI-compatible endpoints) with automated credential and PII scrubbing, or 100% zero-outbound offline heuristics.
 
 2. **⧉ 3-Way Merge Studio**:
-   - 3 synchronized viewports: **Mine (Local)** | **Base (Ancestor)** | **Theirs (Remote)**.
-   - **Real-Time Collapsible Output Preview Pane**: Live 4th pane previewing the merge output buffer with real-time recalculation upon conflict resolution.
-   - Automated conflict detection with real-time status counter.
-   - Resolution actions: `Accept Mine`, `Accept Theirs`, `Accept Base`, and `Take Both`.
-   - **AI Conflict Resolver**: Synthesizes conflict-free resolutions preserving intent from both branches with automated secret scrubbing.
+   - 3 synchronized viewports: **Mine (Local)** | **Base (Ancestor)** | **Theirs (Remote)** + collapsible **4th Merged Output Preview** with standard diff3 conflict markers.
+   - Resolution actions: `Accept Mine`, `Accept Theirs`, `Accept Base`, `Take Both`, `AI Resolve`, full resolution Undo stack, and honors CLI `--output` destination on save.
 
 3. **📁 Folder & Archive Comparison & Interactive Sync Hub**:
-   - **Centered Diff Gutter (`GutterItemDelegate`)**: Custom Qt delegate rendering comparison and orphan status icons (`≠`, `←`, `→`, `=`) centered at exact column width without clipping, depth-based indentation shift, or scrollbar overlap, with synchronized active selection across trees.
-   - **Interactive Folder Sync Hub (`🔄 Sync Hub...`)**: Full synchronization execution engine supporting Mirror L->R, Bi-directional Sync, and Update Left/Right with timestamp preservation (`shutil.copy2`) and orphan pruning.
-   - **Smart `.gitignore` & Exclusion Rules**: Automatically detects and parses `.gitignore` and `.hgignore` files, pruning bloat directories (`node_modules/`, `__pycache__/`, `.venv/`, `.git/`) in-place during directory traversal.
-   - **Asynchronous Background Worker**: Non-blocking `QThread` scanning prevents "(Not Responding)" lockups across 50,000+ files with live progress telemetry and cancellation.
-   - **Folders-First Dual-Tree Hierarchy**: Clean alphabetical directory grouping with default collapsed state for massive repository comparisons.
-   - **Smart Subfolder Matcher**: Automatically detects when a nested module on one side corresponds to the opposing root with 1-click direct compare.
-   - **Instant In-Memory Filtering**: Toggle `* All`, `≠ Diffs`, `= Same` in $<15\text{ms}$ without re-reading the filesystem.
-   - **Multi-Mode Rules**: Byte-by-byte (BLAKE3 / SHA-256 / CRC32 hash), size & timestamp, and rules-based comparison.
-   - **Virtual Archive VFS**: Browse and diff `.zip`, `.jar`, `.tar`, `.tgz` files without manual decompression.
+   - **Flatten Folders Mode (`Flatten`)**: View all files across nested directory hierarchies in one sortable list by relative path.
+   - **±2s Timestamp Tolerance & BLAKE3**: Handles FAT/SMB/DST timestamp skew alongside SHA-256, BLAKE3, and Rules-Based modes.
+   - **Interactive Folder Sync Hub (`Sync Hub...`)**: Supports Mirror L->R, Bi-directional Sync, and Update Left/Right with per-row checkboxes and Windows Recycle Bin safe-delete support.
+   - **HTML & CSV Folder Reports**: Export standalone folder audit reports or CSV summaries straight from the ribbon.
+   - **Smart `.gitignore` & Virtual Archive VFS**: Prunes bloat dirs and browses `.zip`, `.jar`, `.tar`, `.tgz` entries transparently without extraction.
 
 4. **🖼 Visual Media & Document Diff Studio (Images, Multi-Page PDF, SVG)**:
-   - **Multi-Page PDF Document Comparison**: PyMuPDF (`fitz`) raster rendering with Page Prev/Next controls (`◀ Page X/Y ▶`).
-   - **Extracted Text Diff View**: Side-by-side extracted text comparison viewer (`📄 Text Diff`) for documents.
-   - **Photographic EXIF & Document Metadata Inspection**: Side-by-side metadata table (`📷 EXIF / Metadata`) highlighting camera EXIF tags, dimensions, author, and document attributes with diff highlights.
-   - **Vector SVG Support**: Native DOM tree rasterization.
-   - **Swipe Curtain**: Interactive draggable split slider.
-   - **Onion-Skin**: Smooth 0-100% opacity transparency overlay.
-   - **Difference Heatmap**: Tolerance-based pixel delta heatmap.
-   - **Flicker / Blink**: High-frequency alternating blink timer to spot micro-differences.
+   - **Live (X, Y) RGBA Pixel Inspector**: Hover anywhere on the canvas to read Left vs Right RGBA pixel values and per-channel deltas.
+   - **Interactive Zoom (`Fit` / `100%` / `Ctrl+Wheel`), Swap & Drag-and-Drop**.
+   - **Multi-Page PDF & EXIF**: PyMuPDF (`fitz`) page rasterization, aligned extracted text diff, EXIF metadata table, Swipe Curtain, Onion-Skin, Pixel Heatmap, Flicker/Blink, and Side-by-Side views.
 
 5. **📊 Tabular / Spreadsheet Diff (CSV, TSV, Excel, Parquet, SQLite)**:
-   - **Apache Parquet Ingestion**: Direct loading of `*.parquet` columnar data via `pyarrow`.
-   - **SQLite Database Ingestion**: Direct inspection and table diffing of `*.db`, `*.sqlite`, `*.sqlite3` databases.
-   - **Floating-Point Numerical Tolerance**: `Float Tol:` spinbox in the command bar (e.g. `0.001` precision); numerical values differing by $\le \text{tolerance}$ are evaluated as equal.
-   - **Keyed Row Alignment**: Primary Key selector aligns records even if rows are sorted or reordered.
-   - Cell-level mutation tracking with old-vs-new tooltips.
-   - Dual synchronized horizontal and vertical scrolling.
+   - Sheet & SQLite table selectors, **Float Tolerance**, **Keyed Row Alignment** with duplicate-key reporting, Diff CSV export, and synchronized grids.
 
-6. **🌳 Structured Tree Diff (JSON, YAML, XML)**:
-   - **JSONPath & XPath Query Bar**: Interactive query evaluation (e.g. `$.store.book[*].title` or `//item`) filtering large documents before diffing.
-   - **Semantic Unordered Array Matching**: "Unordered Arrays" checkbox matches JSON array elements by value or entity identifiers (`id`, `key`, `name`, `uuid`) rather than rigid sequential indices.
-   - Hierarchical node comparison independent of indentation or line formatting.
-   - Key sorting option to ignore dictionary ordering.
+6. **🌳 Structured Tree Diff (JSON, YAML, XML)** & **🛡️ 7. API Contract Audit (OpenAPI, GraphQL, Protobuf)**:
+   - JSONPath & XPath query filtering, Semantic Unordered Array matching, recursive search, XML tag rename detection, and breaking vs warning vs additive contract audits.
 
-7. **⚡ Hex & Binary Inspection Studio**:
-   - **Memory-Mapped I/O (MMF)**: Opens multi-gigabyte binaries without UI lag or memory exhaustion.
-   - 16-byte aligned rows (Offset, Hexadecimal, ASCII).
-   - Byte-level mismatch tracking and instant Next/Prev difference jumping.
+8. **⚡ Hex & Binary Inspection Studio**:
+   - **Virtualized `QTableView` + Memory-Mapped I/O (MMF)**: Inspects multi-GB binaries with byte-delta highlighting, Go-to-Offset, Find Hex/ASCII patterns, and live 8/16/32/64-bit integer Data Inspector.
 
-8. **🤖 Headless CI/CD Automation & CLI Stdin Diffing**:
-   - Automated batch execution without GUI:
-     ```powershell
-     python app/main.py --folder-diff dir_a/ dir_b/ --report-html report.html --exit-code
-     python app/main.py --diff file_a.py file_b.py --report-html diff.html --exit-code
-     ```
-   - **CLI Stdin Diffing**: Pipe command outputs directly into the diff engine without temp files:
-     ```powershell
-     git show HEAD~1:main.py | python app/main.py --diff - main.py
-     ```
-   - Standardized exit codes: `0 = Identical`, `1 = Content mismatch`, `2 = Error`.
-   - Standalone, self-contained HTML diff reports with responsive styling.
+9. **🌿 Git Working-Tree Changeset Browser (`Ctrl+G`) & Live Hunk Staging**:
+   - Browse modified, staged, untracked, and conflicted files across any Git repo (`Ctrl+G` or Home button) and open `HEAD vs Working Copy` directly.
+   - Stage, unstage, or discard individual hunks via `git apply --cached`, plus 1-click **Tools → Configure as Git Difftool & Mergetool**.
 
-9. **⚡ Live Visual Git Chunk Staging (`git apply --cached`)**:
-    - Stage, unstage, or discard hunks directly inside the 2-way diff viewport.
-    - Right-click diff connector or use top-bar `Git` dropdown to perform partial commits without leaving the editor.
-    - Instant "Compare with Git HEAD" button.
-
-10. **🛡️ Write-Ahead Log (WAL) Crash Recovery**:
-    - Append-only JSONL transaction journal in `%APPDATA%/diff_and_compare/wal/` recording live keystrokes.
-    - Automatic recovery prompt restores unsaved buffers upon unexpected shutdowns or crashes.
-
-11. **🪟 Windows 11 Platform Polish, Single-Instance IPC & Shell**:
-    - **Single-Instance IPC Tab Remoting**: Named pipes dispatch CLI/Explorer arguments to existing window tabs without process bloat.
-    - **Custom High-Resolution Application Icon**: Signature dual-card Fluent icon embedded into the executable, taskbar, titlebar, and Windows Explorer context menus with 7 discrete raster mipmaps (`256×256` down to `16×16`).
-    - **Branded Explorer Context Menu**: Top-level entries (`Compare with diff_and_compare_tool`, `diff_and_compare_tool: Select Left`, `diff_and_compare_tool: Select Right`) with direct icon binding.
-    - **Windows 11 DWM Mica Alt Backdrop**: Native Mica Alt tabbed material backdrop via `DwmSetWindowAttribute`, synchronizing with light/dark theme toggles.
-    - **Dynamic Multi-Session Tab Lifecycle & Pinned Home**: Clean cold launch with only the Home dashboard visible by default, permanent non-closable Home tab, resilient on-demand studio instantiation from launcher cards, and zero ghost-tab desynchronization upon closing and reopening comparisons.
-    - **Rich Session Restoration**: Persists open tabs, active studio indices, and exact left/right/ancestor file and folder paths across application restarts.
+10. **⌘ Command Palette (`Ctrl+K`) & Headless CI/CD Automation**:
+   - Universal keyboard launcher (`Ctrl+K` / `Ctrl+Shift+P`) across all 10 studios, active view actions, Git tools, and Recent Comparisons.
+   - Headless `--folder-diff`, `--diff`, and `--contract-diff` with HTML/JSON reporting and exit codes (`0 = match`, `1 = mismatch/breaking`, `2 = error`), plus CLI Stdin Diffing (`--diff - <file>`), Write-Ahead Log (WAL) crash recovery, and Windows 11 Mica Alt Fluent Light shell integration.
 
 ---
 
@@ -190,13 +149,15 @@ python build.py --target-arch arm64
 
 ## 🔮 Strategic Next-Phase Roadmap
 
-- **Direct CLI Stream Diffing**: Support piping directly from stdin via `diff_and_compare.exe --diff - target.py` without writing temporary files.
-- **Live Visual Git Chunk Staging**: Inline gutter actions (`[+] Stage Chunk`, `[-] Discard Chunk`) executing `git apply --cached` directly from the 2-way diff view.
-- **Crash Recovery Journaling (WAL)**: Append-only write-ahead log in `%APPDATA%/diff_and_compare/wal/` ensuring in-flight edits survive unexpected crashes.
+- **Remote Virtual Filesystem Adapters**: Streaming comparison across SSH/SFTP and S3-compatible buckets.
+- **Native Code Signing & Winget Distribution**: Signed Windows installer releases distributed via `winget`.
+- **Audio & Geospatial Studio Plugins**: Optional waveform spectral diffing and GeoJSON/Shapefile layer comparison.
 
 ---
 
 ## 📚 Technical Documentation
+
+- **[Product Website & Feature Explorer](docs/index.html)**: Interactive Fluent Light landing page, commercial comparison matrix, and CLI reference.
 
 - **[Functionality & User Guide](docs/FUNCTIONALITY_GUIDE.md)**: Exhaustive manual detailing all features, workflows, and keyboard shortcuts.
 - **[System Architecture & Design Specification](docs/ARCHITECTURE_AND_DESIGN.md)**: Deep technical architecture, algorithms (Tree-sitter AST, Myers, DMP, Moved Blocks, Keyed Grid, MMF, VFS, Secret Scrubber), and Windows 11 shell integration.

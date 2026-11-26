@@ -9,6 +9,7 @@ Exit codes:
 2 = Error (missing path, permission, etc.)
 """
 
+import csv
 import os
 import sys
 import time
@@ -17,7 +18,7 @@ import json
 from dataclasses import asdict
 from typing import Optional, List, Tuple
 from app.core.folder_compare_engine import FolderCompareEngine, FolderCompareItem
-from app.core.diff_engine import DiffEngine
+from app.core.diff_engine import DiffEngine, AlignedDiffResult
 from app.core.contract_diff import ContractDiffEngine
 
 
@@ -375,3 +376,187 @@ class HeadlessReporter:
 </div></body></html>"""
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(html_content)
+
+    @staticmethod
+    def _render_highlighted_html(text: str, spans, mark_cls: str) -> str:
+        """Escapes line text cleanly while wrapping intraline diff spans in <mark>."""
+        if not text:
+            return "&nbsp;"
+        if not spans:
+            return html.escape(text)
+        parts = []
+        cursor = 0
+        n = len(text)
+        for s in sorted(spans, key=lambda sp: sp.start):
+            st = max(cursor, min(s.start, n))
+            en = max(st, min(s.end, n))
+            if st > cursor:
+                parts.append(html.escape(text[cursor:st]))
+            if en > st:
+                parts.append(f'<mark class="{mark_cls}">{html.escape(text[st:en])}</mark>')
+            cursor = en
+        if cursor < n:
+            parts.append(html.escape(text[cursor:]))
+        return "".join(parts)
+
+    @classmethod
+    def generate_side_by_side_html_report(
+        cls,
+        left_text: str,
+        right_text: str,
+        left_label: str = "Left",
+        right_label: str = "Right",
+        output_file: Optional[str] = None,
+        ignore_whitespace: str = "none",
+        ignore_case: bool = False,
+        regex_rules=None
+    ) -> str:
+        """Generates a self-contained Fluent Light side-by-side HTML diff report with intraline marks."""
+        res: AlignedDiffResult = DiffEngine.build_aligned_diff(
+            left_text, right_text,
+            ignore_whitespace=ignore_whitespace,
+            ignore_case=ignore_case,
+            regex_rules=regex_rules or [],
+            ast_semantic=False,
+        )
+
+        n_rows = len(res.left_display_lines)
+        row_tags = ["equal"] * n_rows
+        l_spans_by_row = {}
+        r_spans_by_row = {}
+        added = deleted = modified = moved = 0
+
+        for ch in res.chunks:
+            if ch.tag == "equal":
+                continue
+            if ch.tag == "insert":
+                added += 1
+            elif ch.tag == "delete":
+                deleted += 1
+            elif ch.tag == "replace":
+                modified += 1
+            elif ch.tag == "moved":
+                moved += 1
+            for r in range(ch.left_start, min(ch.left_end, n_rows)):
+                row_tags[r] = ch.tag
+            for k, sp in ch.left_char_spans.items():
+                l_spans_by_row[ch.left_start + k] = sp
+            for k, sp in ch.right_char_spans.items():
+                r_spans_by_row[ch.right_start + k] = sp
+
+        rows_html = []
+        for idx in range(n_rows):
+            tag = row_tags[idx]
+            is_diff = "1" if tag != "equal" else "0"
+            l_spacer = idx in res.left_spacers
+            r_spacer = idx in res.right_spacers
+
+            l_num = "" if l_spacer else str(res.left_line_numbers.get(idx, idx + 1))
+            r_num = "" if r_spacer else str(res.right_line_numbers.get(idx, idx + 1))
+
+            l_cls = "cell-spacer" if l_spacer else f"cell-{tag}-l"
+            r_cls = "cell-spacer" if r_spacer else f"cell-{tag}-r"
+            if tag == "replace" and not l_spacer and r_spacer:
+                l_cls = "cell-delete-l"
+            elif tag == "replace" and l_spacer and not r_spacer:
+                r_cls = "cell-insert-r"
+
+            l_html = "&nbsp;" if l_spacer else cls._render_highlighted_html(
+                res.left_display_lines[idx], l_spans_by_row.get(idx), "mark-del"
+            )
+            r_html = "&nbsp;" if r_spacer else cls._render_highlighted_html(
+                res.right_display_lines[idx], r_spans_by_row.get(idx), "mark-add"
+            )
+            rows_html.append(
+                f'<tr class="diff-row" data-diff="{is_diff}">'
+                f'<td class="ln">{l_num}</td><td class="code {l_cls}">{l_html}</td>'
+                f'<td class="ln">{r_num}</td><td class="code {r_cls}">{r_html}</td></tr>'
+            )
+
+        html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Side-by-Side Diff Report — diff_and_compare_tool</title>
+<style>
+    body {{ font-family: "Segoe UI", -apple-system, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 20px; }}
+    .wrap {{ max-width: 1440px; margin: 0 auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(15,23,42,0.06); }}
+    .head {{ padding: 18px 22px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border-bottom: 1px solid #cbd5e1; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }}
+    .head h1 {{ margin: 0 0 6px 0; font-size: 18px; color: #0f172a; }}
+    .meta {{ font-size: 12px; color: #475569; font-family: Consolas, monospace; }}
+    .badges {{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }}
+    .pill {{ padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid #cbd5e1; background: #fff; }}
+    .p-add {{ color: #1a7f37; background: #dafbe1; border-color: #4ac26b; }}
+    .p-del {{ color: #cf222e; background: #ffebe9; border-color: #ff8182; }}
+    .p-mod {{ color: #0969da; background: #eff6ff; border-color: #93c5fd; }}
+    .p-mov {{ color: #8250df; background: #f5f3ff; border-color: #c4b5fd; }}
+    .btn {{ padding: 5px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-weight: 600; cursor: pointer; font-size: 12px; }}
+    .btn.active {{ background: #0969da; color: #ffffff; border-color: #0969da; }}
+    table {{ width: 100%; border-collapse: collapse; table-layout: fixed; font-family: Consolas, "Cascadia Code", monospace; font-size: 12.5px; line-height: 1.45; }}
+    th {{ background: #f1f5f9; color: #334155; font-family: "Segoe UI", sans-serif; font-size: 12px; text-align: left; padding: 8px 10px; border-bottom: 1.5px solid #cbd5e1; }}
+    td.ln {{ width: 46px; text-align: right; padding: 1px 8px; color: #64748b; background: #f8fafc; border-right: 1px solid #e2e8f0; user-select: none; }}
+    td.code {{ padding: 1px 10px; white-space: pre-wrap; word-break: break-word; border-right: 1px solid #e2e8f0; vertical-align: top; }}
+    .cell-spacer {{ background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 4px, #f1f5f9 4px, #f1f5f9 8px); }}
+    .cell-insert-r, .cell-insert-l {{ background: #e6ffec; }}
+    .cell-delete-l, .cell-delete-r {{ background: #ffebe9; }}
+    .cell-replace-l, .cell-replace-r {{ background: #eff6ff; }}
+    .cell-moved-l, .cell-moved-r {{ background: #f5f3ff; }}
+    mark.mark-del {{ background: #ffcecb; color: #82071e; border-radius: 2px; padding: 0 1px; }}
+    mark.mark-add {{ background: #aceebb; color: #0a3622; border-radius: 2px; padding: 0 1px; }}
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="head">
+        <div>
+            <h1>Side-by-Side Comparison Report</h1>
+            <div class="meta"><strong>Left:</strong> {html.escape(left_label)} &nbsp;|&nbsp; <strong>Right:</strong> {html.escape(right_label)}</div>
+        </div>
+        <div class="badges">
+            <span class="pill p-add">+{added} added</span>
+            <span class="pill p-del">-{deleted} deleted</span>
+            <span class="pill p-mod">~{modified} modified</span>
+            <span class="pill p-mov">{moved} moved</span>
+            <button class="btn active" onclick="filterRows(false, this)">All Lines</button>
+            <button class="btn" onclick="filterRows(true, this)">Diffs Only</button>
+        </div>
+    </div>
+    <table>
+        <thead><tr><th style="width:46px">#</th><th>{html.escape(left_label)}</th><th style="width:46px">#</th><th>{html.escape(right_label)}</th></tr></thead>
+        <tbody>{"".join(rows_html)}</tbody>
+    </table>
+</div>
+<script>
+function filterRows(diffsOnly, btn) {{
+    document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('tr.diff-row').forEach(tr => {{
+        tr.style.display = (diffsOnly && tr.dataset.diff !== '1') ? 'none' : '';
+    }});
+}}
+</script>
+</body>
+</html>"""
+        if output_file:
+            os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(html_content)
+        return html_content
+
+    @classmethod
+    def generate_folder_csv_report(cls, flat_items: List[FolderCompareItem], output_file: str) -> None:
+        """Exports folder comparison items as a UTF-8 CSV report."""
+        os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
+        with open(output_file, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Status", "Type", "RelativePath", "LeftSizeBytes", "RightSizeBytes", "Reason"])
+            for it in flat_items:
+                writer.writerow([
+                    it.status,
+                    "Folder" if it.is_dir else "File",
+                    it.rel_path,
+                    "" if it.left_size is None else it.left_size,
+                    "" if it.right_size is None else it.right_size,
+                    it.diff_reason or ("Match" if it.status == "SAME" else ""),
+                ])

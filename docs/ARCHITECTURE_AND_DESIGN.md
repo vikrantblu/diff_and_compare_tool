@@ -6,59 +6,63 @@
 
 ```mermaid
 graph TD
-    subgraph UI_Layer [Presentation & Shell Layer]
-        MW[MainWindow - Windows 11 Fluent Shell]
+    subgraph UI_Layer [Presentation & Shell Layer — Fluent Light Only]
+        MW[MainWindow - Windows 11 Fluent Light Shell]
         Tabs[Multi-Session Tab Manager & Workspaces]
-        Diff2W[DiffView - 2-Way Code Diff + Minimap + Virtual Viewport]
-        Merge3W[MergeView - 3-Way Merge Studio + Real-Time Preview]
-        DirComp[DirCompareView - Folder & VFS Sync + GitIgnore]
+        CmdPalette[CommandPaletteDialog - Ctrl+K Launcher]
+        GitDlg[GitChangesDialog - Ctrl+G Repo Browser]
+        Diff2W[DiffView - 2-Way Code Diff + Line Details + Minimap]
+        Merge3W[MergeView - 3-Way Merge Studio + Diff3 Preview]
+        DirComp[DirCompareView - Folder, Flatten & VFS Sync]
         FolderSyncDlg[FolderSyncDialog - Sync Hub Modal]
-        ImgDiff[ImageDiffView - Visual Media Studio - Images, PDF, SVG, EXIF]
-        TblDiff[TabularDiffView - Keyed Grid Studio - Parquet, SQLite, Float Tol]
-        TreeDiff[StructuredDiffView - Tree Studio - JSONPath, XPath, Semantic Sort]
-        HexDiff[HexDiffView - MMF Binary Inspector]
+        ImgDiff[ImageDiffView - Media Studio - Images, PDF, SVG, RGBA]
+        TblDiff[TabularDiffView - Keyed Grid Studio - Parquet, SQLite]
+        TreeDiff[StructuredDiffView - Tree & API Contract Studio]
+        HexDiff[HexDiffView - Virtualized QTableView MMF Inspector]
         AISummaryDlg[AISummaryDialog - PR Summarizer & Conflict Resolver]
     end
 
     subgraph Core_Engines [Domain-Specific Comparison Engines]
-        DiffEngine[DiffEngine - Myers Line + DMP Intraline + Moved Blocks + BLAKE3]
+        DiffEngine[DiffEngine - Myers + DMP + Moved Blocks + Diff3 + BLAKE3]
         ASTEngine[ASTSemanticDiffer - Tree-sitter CST Parser & Structural Diff]
-        FolderSyncEngine[FolderSyncEngine - Mirror / Bi-directional / Update Execution]
-        FolderCompEngine[FolderCompareEngine - QThread Background Scanner & .gitignore]
-        ImgEngine[ImageDiffEngine - PyMuPDF PDF, SVG DOM, EXIF, Curtain, Heatmap]
-        TblEngine[TabularDiffEngine - PyArrow Parquet, SQLite, Keyed Alignment, Float Tol]
+        ContractEngine[ContractDiffEngine - OpenAPI / GraphQL / Protobuf Audit]
+        FileIO[FileIO - Archive VFS, .docx Extractor, Encoding & EOL]
+        FolderSyncEngine[FolderSyncEngine - Recycle Bin Safe Sync Execution]
+        FolderCompEngine[FolderCompareEngine - QThread Scanner, ±2s Tol & .gitignore]
+        ImgEngine[ImageDiffEngine - PyMuPDF PDF, SVG DOM, EXIF, Vectorized Heatmap]
+        TblEngine[TabularDiffEngine - PyArrow Parquet, SQLite, Keyed Alignment]
         StructEngine[StructuredDiffEngine - JSONPath, XPath, Semantic Array Normalizer]
         HexEngine[HexDiffEngine - Memory-Mapped Binary Streamer]
         VFS[ArchiveVFS - Transparent ZIP/TAR Filesystem]
-        AI[AIAssistant - PR Summaries & Conflict Resolver]
+        GitMgr[GitStagingManager - Working-Tree Browser & Hunk Staging]
+        AI[AIAssistant - PR Summaries, Conflict Resolver & Zero-Outbound Mode]
         Scrubber[SecretScrubber - PII & Credential Sanitizer / Privacy Shield]
-        Reporter[HeadlessReporter - Standalone HTML & JSON Report Generator]
+        Reporter[HeadlessReporter - Side-by-Side HTML, CSV & Contract Reports]
     end
 
     subgraph Platform_Layer [Windows 11 & Storage Integration]
         MMF[Memory-Mapped File I/O - mmap]
-        WinEffects[WindowsEffects - DWM Mica Alt / Acrylic / Dark Titlebar]
+        WinEffects[WindowsEffects - DWM Mica Alt Light Backdrop]
         SparsePkg[MSIX Sparse Package - IExplorerCommand]
         Win32Reg[Windows Registry Context Menu]
-        RemoteMgr[RemoteManager - SFTP & S3 Adapters]
-        SessionMgr[SessionManager - Workspace & Active Session JSON Persistence]
+        SessionMgr[SessionManager - Sessions, Recents, Profiles & Custom Rules]
     end
 
-    MW --> Tabs
+    MW --> Tabs & CmdPalette & GitDlg
     MW --> WinEffects
     Tabs --> Diff2W & Merge3W & DirComp & ImgDiff & TblDiff & TreeDiff & HexDiff
-    Diff2W --> DiffEngine & ASTEngine & Scrubber & AI
-    Merge3W --> DiffEngine & Scrubber & AI
-    DirComp --> FolderCompEngine & FolderSyncEngine & VFS & RemoteMgr & DiffEngine
+    Diff2W --> DiffEngine & ASTEngine & FileIO & GitMgr & Scrubber & AI & Reporter
+    Merge3W --> DiffEngine & FileIO & Scrubber & AI
+    DirComp --> FolderCompEngine & FolderSyncEngine & VFS & FileIO & Reporter
     DirComp --> FolderSyncDlg
     FolderSyncDlg --> FolderSyncEngine
     Diff2W --> AISummaryDlg
     ImgDiff --> ImgEngine
     TblDiff --> TblEngine
-    TreeDiff --> StructEngine
+    TreeDiff --> StructEngine & ContractEngine
     HexDiff --> HexEngine & MMF
     MW --> SessionMgr & SparsePkg & Win32Reg
-    Reporter --> FolderCompEngine & DiffEngine
+    Reporter --> FolderCompEngine & DiffEngine & ContractEngine
 ```
 
 ---
@@ -441,10 +445,10 @@ The `--exit-code` flag returns standard POSIX exit codes suitable for automated 
 - `1`: **Mismatch** — Differences detected (files modified, left-only, or right-only).
 - `2`: **Error** — Fatal invocation error (invalid path, permission denied, missing file).
 
-### 6.2 Standalone HTML Report Architecture
-- **Self-Contained Single-File Output**: Generates an all-in-one HTML report with zero external CDN scripts, stylesheets, or web requests, making it safe for air-gapped environments.
-- **Responsive Fluent Dark/Light Theme**: Built-in CSS with modern responsive tables, badges, and clean typography.
-- **Side-by-Side Code Diff Tables**: Color-coded line additions (green), deletions (red), and modifications (blue) with aligned line numbering.
+### 6.2 Standalone HTML & CSV Report Architecture
+- **Self-Contained Single-File Output**: Generates all-in-one HTML reports (Folder Comparison, Side-by-Side Code Diff with intraline `<mark>` spans & JS `All / Diffs Only` toggle, and API Contract Audits) plus UTF-8 CSV folder summaries with zero external CDN requests.
+- **Fluent Light Presentation**: Clean high-contrast white/slate typography, semantic addition/deletion/modification/moved color badges, and print-friendly layout.
+- **Side-by-Side Code Diff Tables**: Color-coded line additions (green), deletions (red), modifications (blue), and moved blocks (purple) with aligned line numbering.
 - **Directory Tree Summary Badges**: Collapsible folder lists with real-time statistics counters (`Total Files`, `Diffs`, `Left Only`, `Right Only`, `Identical`).
 
 ---
@@ -462,8 +466,8 @@ Qt Style Sheets (QSS) cascade generic widget-type selectors (`QWidget { ... }`, 
 - **Centered Menu Indicators**: Dropdown action buttons attached via `setMenu()` utilize native, vertically-centered dropdown indicators with balanced padding, replacing unstyled, sagging corner indicators.
 
 ### 7.3 Vector Form Control & Checkbox Architecture
-- **Multi-State Indicator Styling**: Checkbox indicators define explicit styles for default (`#ffffff` / `#0b1120`), hover (`#eff6ff` / `#1e293b`), and checked states.
-- **Embedded Checkmark Assets**: Checked checkboxes reference high-DPI vector checkmark images (`image: url(...)`) across both Light (`#2563eb` gradient) and Dark (`#0284c7`) themes, eliminating blank blue swatch rendering.
+- **Multi-State Indicator Styling**: Checkbox indicators define explicit Fluent Light styles for default (`#ffffff`), hover (`#eff6ff`), and checked states (`#0969da`).
+- **Embedded Checkmark Assets**: Checked checkboxes reference bundled high-DPI vector checkmark assets (`checkmark.png` resolved across source and PyInstaller `_MEIPASS`) in Crisp Fluent Light mode, ensuring reliable rendering across standalone builds.
 
 ### 7.4 Per-Pane Telemetry & Diff Metrics HUD
 - **Contextual Tooltips**: File header badges display color-coded deltas (`+added` in green, `-deleted` in red, `~modified` in blue) backed by explanatory tooltips (*"Differences in this file: +added, -deleted, ~modified"*).

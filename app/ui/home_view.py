@@ -83,6 +83,7 @@ class HomeView(QWidget):
     sessionSelected = Signal(str)                          # mode_id
     compareFilesRequested = Signal(str, str)               # (left_path, right_path)
     clipboardCompareRequested = Signal()
+    gitChangesRequested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -153,14 +154,21 @@ class HomeView(QWidget):
 
         main_layout.addWidget(row2_widget)
 
-        # Quick Action: Compare Clipboard
+        # Quick Actions: Compare Clipboard & Git Working Changes
         qa_row = QHBoxLayout()
         qa_row.setAlignment(Qt.AlignCenter)
+        qa_row.setSpacing(10)
         self.btn_compare_clipboard = QPushButton(" Compare Clipboard vs Text Studio")
         self.btn_compare_clipboard.setIcon(get_line_icon("clipboard", "#0969da"))
         self.btn_compare_clipboard.setFixedHeight(30)
         self.btn_compare_clipboard.clicked.connect(self.clipboardCompareRequested.emit)
         qa_row.addWidget(self.btn_compare_clipboard)
+
+        self.btn_git_changes = QPushButton(" Browse Git Changes (Ctrl+G)")
+        self.btn_git_changes.setIcon(get_line_icon("git-branch", "#1a7f37"))
+        self.btn_git_changes.setFixedHeight(30)
+        self.btn_git_changes.clicked.connect(self.gitChangesRequested.emit)
+        qa_row.addWidget(self.btn_git_changes)
         main_layout.addLayout(qa_row)
 
         # 4. Staged Left Target Pill (shown only when a Left target is staged)

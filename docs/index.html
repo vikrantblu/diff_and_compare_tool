@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>diff_and_compare_tool — Next-Gen Diff, Merge & Multi-Format Studio</title>
+  <meta name="description" content="Open-source Windows 11 & cross-platform diff, 3-way merge, folder sync, API contract audit, Word/PDF, image, tabular, structured tree, and hex inspection studio." />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-subtle: #f8fafc;
+      --bg-muted: #f1f5f9;
+      --border: #cbd5e1;
+      --border-soft: #e2e8f0;
+      --text: #0f172a;
+      --text-secondary: #475569;
+      --blue: #0969da;
+      --blue-bg: #eff6ff;
+      --blue-border: #93c5fd;
+      --green: #1a7f37;
+      --green-bg: #dafbe1;
+      --red: #cf222e;
+      --red-bg: #ffebe9;
+      --purple: #8250df;
+      --purple-bg: #f5f3ff;
+      --amber: #b45309;
+      --amber-bg: #fef3c7;
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code, pre {
+      font-family: "Cascadia Code", Consolas, ui-monospace, monospace;
+    }
+
+    /* Sticky Top Navbar */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 16px;
+      color: var(--text);
+    }
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, #0969da 0%, #60a5fa 100%);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 800;
+      box-shadow: var(--shadow-sm);
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .nav-links a { color: var(--text-secondary); }
+    .nav-links a:hover { color: var(--blue); text-decoration: none; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: var(--bg-subtle); border-color: #94a3b8; text-decoration: none; }
+    .btn-primary {
+      background: linear-gradient(180deg, #0969da 0%, #0550ae 100%);
+      color: #ffffff;
+      border-color: #0550ae;
+      box-shadow: 0 2px 8px rgba(9, 105, 218, 0.22);
+    }
+    .btn-primary:hover { background: #0550ae; color: #ffffff; }
+
+    /* Containers & Sections */
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    .section { padding: 64px 0; }
+    .section-alt { background: var(--bg-subtle); border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+    .section-title { font-size: 30px; font-weight: 800; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    .section-sub { color: var(--text-secondary); font-size: 16px; max-width: 720px; margin: 0 0 32px 0; }
+
+    /* Hero */
+    .hero {
+      padding: 64px 0 48px 0;
+      background: radial-gradient(circle at top right, #eff6ff 0%, #ffffff 55%);
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: var(--blue-bg);
+      border: 1px solid var(--blue-border);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      font-size: clamp(32px, 5vw, 48px);
+      line-height: 1.12;
+      letter-spacing: -0.03em;
+      margin: 0 0 16px 0;
+      max-width: 820px;
+    }
+    .hero p {
+      font-size: 18px;
+      color: var(--text-secondary);
+      max-width: 700px;
+      margin: 0 0 26px 0;
+    }
+    .hero-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 36px; }
+
+    /* Mock Studio Preview */
+    .preview-shell {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+    .preview-bar {
+      background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12.5px;
+    }
+    .preview-pane { border-right: 1px solid var(--border-soft); }
+    .preview-pane:last-child { border-right: none; }
+    .preview-pane-head {
+      background: var(--bg-subtle);
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      justify-content: space-between;
+      font-family: "Segoe UI", sans-serif;
+      font-size: 11.5px;
+      font-weight: 700;
+    }
+    .code-row { padding: 3px 12px; white-space: pre; overflow-x: auto; }
+    .row-del { background: var(--red-bg); }
+    .row-add { background: var(--green-bg); }
+    .row-mod { background: var(--blue-bg); }
+    .row-mov { background: var(--purple-bg); }
+    .mark-del { background: #ffcecb; color: #82071e; border-radius: 2px; padding: 0 2px; font-weight: 700; }
+    .mark-add { background: #aceebb; color: #0a3622; border-radius: 2px; padding: 0 2px; font-weight: 700; }
+    .line-details-mock {
+      background: var(--bg-subtle);
+      border-top: 1px solid var(--border);
+      padding: 10px 14px;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+    }
+    .ld-title { font-family: "Segoe UI", sans-serif; font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; }
+    .ld-line { background: #fff; border: 1px solid var(--border-soft); border-radius: 4px; padding: 3px 8px; margin-bottom: 4px; }
+
+    /* Highlight Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .card h3 { margin: 0 0 8px 0; font-size: 16px; }
+    .card p { margin: 0; font-size: 13.5px; color: var(--text-secondary); }
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+      background: var(--blue-bg);
+      color: var(--blue);
+      border: 1px solid var(--blue-border);
+    }
+
+    /* Interactive Studio Tabs */
+    .studio-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .studio-tab {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .studio-tab.active {
+      background: var(--blue);
+      color: #ffffff;
+      border-color: var(--blue);
+    }
+    .studio-detail {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+    .studio-detail h3 { margin-top: 0; font-size: 20px; }
+    .studio-list { padding-left: 18px; color: var(--text-secondary); }
+    .studio-list li { margin-bottom: 6px; }
+
+    /* Comparison Table */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #ffffff;
+      box-shadow: var(--shadow-sm);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border-soft); }
+    th { background: var(--bg-muted); color: var(--text); font-weight: 700; }
+    tr:last-child td { border-bottom: none; }
+    .yes { color: var(--green); font-weight: 700; }
+    .no { color: #94a3b8; }
+
+    /* Code Blocks */
+    .code-card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .code-card-head {
+      background: var(--bg-muted);
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+    .copy-btn {
+      padding: 4px 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); }
+    .code-card pre {
+      margin: 0;
+      padding: 14px 16px;
+      overflow-x: auto;
+      font-size: 13px;
+      background: #ffffff;
+      color: var(--text);
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 11.5px;
+      font-family: Consolas, monospace;
+      color: var(--text);
+      background: var(--bg-muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: inset 0 -1px 0 var(--border);
+    }
+
+    footer {
+      border-top: 1px solid var(--border-soft);
+      padding: 32px 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+      background: var(--bg-subtle);
+    }
+    @media (max-width: 760px) {
+      .preview-grid { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <div class="nav-inner">
+      <div class="brand">
+        <span class="brand-mark">⇄</span>
+        <span>diff_and_compare_tool</span>
+      </div>
+      <nav class="nav-links">
+        <a href="#features">Highlights</a>
+        <a href="#studios">10 Studios</a>
+        <a href="#comparison">Compare vs Commercial</a>
+        <a href="#cli">CLI &amp; CI/CD</a>
+        <a href="#shortcuts">Shortcuts</a>
+      </nav>
+      <a class="btn btn-primary" href="https://github.com/vikrantblu/diff_and_compare_tool" target="_blank" rel="noopener">GitHub Repo</a>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">Free &amp; Open Source • MIT License • Windows 11 Fluent Light Studio</div>
+      <h1>Commercial-Grade File, Folder, Document &amp; API Comparison Suite.</h1>
+      <p>
+        Built in PySide6 for speed, precision, and zero cloud lock-in. Compare source code with AST &amp; intraline Line Details,
+        audit 3-way merges, sync folders &amp; archives, inspect Word <code>.docx</code>, PDFs, images, Parquet/SQLite,
+        JSON/YAML/XML, OpenAPI/GraphQL/Protobuf contracts, and multi-GB binaries in one unified Fluent Light desktop workspace.
+      </p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="https://github.com/vikrantblu/diff_and_compare_tool/releases" target="_blank" rel="noopener">Download Windows Installer</a>
+        <a class="btn" href="#cli">Quickstart CLI &amp; Git Setup</a>
+        <a class="btn" href="FUNCTIONALITY_GUIDE.md">Read Full Manual</a>
+      </div>
+
+      <div class="preview-shell" aria-label="2-Way Diff & Line Details Preview">
+        <div class="preview-bar">
+          <span>2-Way Text Diff  •  Display: Context ±3  •  Line Details Active  •  Read-Only Baseline Lock</span>
+          <span>+2 added  •  -1 deleted  •  ~1 modified  •  1 moved</span>
+        </div>
+        <div class="preview-grid">
+          <div class="preview-pane">
+            <div class="preview-pane-head">
+              <span style="color:#1d4ed8;">MINE / LEFT — service_v1.py 🔒</span>
+              <span style="color:#475569;">UTF-8 | LF</span>
+            </div>
+            <div class="code-row row-mod">12  rate = <span class="mark-del">0.20</span></div>
+            <div class="code-row row-del">13  # legacy synchronous branch</div>
+            <div class="code-row row-mov">18  def audit_event(uid): ...</div>
+          </div>
+          <div class="preview-pane">
+            <div class="preview-pane-head">
+              <span style="color:#15803d;">THEIRS / RIGHT — service_v2.py 🔓</span>
+              <span style="color:#475569;">UTF-8 BOM | CRLF</span>
+            </div>
+            <div class="code-row row-mod">12  rate = <span class="mark-add">0.25</span></div>
+            <div class="code-row row-add">13  logger.info("rate=%s", rate)</div>
+            <div class="code-row row-mov">24  def audit_event(uid): ...</div>
+          </div>
+        </div>
+        <div class="line-details-mock">
+          <div class="ld-title">LINE DETAILS — Row L:12 vs R:12  •  Modified (2 char delta)</div>
+          <div class="ld-line"><strong style="color:#1d4ed8;">LEFT </strong> rate = <span class="mark-del">0.20</span></div>
+          <div class="ld-line"><strong style="color:#15803d;">RIGHT</strong> rate = <span class="mark-add">0.25</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="section">
+    <div class="container">
+      <h2 class="section-title">Designed to Rival Commercial Suites</h2>
+      <p class="section-sub">
+        Every productivity essential popularized by Beyond Compare 5, Araxis Merge, and Kaleidoscope 5—engineered cleanly without bloat.
+      </p>
+      <div class="cards-grid">
+        <div class="card">
+          <span class="tag">Text &amp; Code</span>
+          <h3>Bottom Line Details &amp; Display Filters</h3>
+          <p>Inspect any line stacked character-by-character, switch between All Lines, Diffs Only, Context ±3, or Same Only, and anchor alignments manually.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Safety &amp; Formats</span>
+          <h3>Read-Only Lock &amp; Encoding Converter</h3>
+          <p>Lock baseline panes against accidental edits or hunk transfers, convert UTF-8 / UTF-8 BOM / UTF-16 / CP1252 and LF/CRLF/CR, and auto-detect external file edits.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Office &amp; Media</span>
+          <h3>Word .docx, Multi-Page PDF &amp; RGBA Pixel</h3>
+          <p>Extract text and tables from Word <code>.docx</code>, compare multi-page PDFs &amp; SVGs, and hover image canvases for live (X, Y) RGBA pixel delta coordinates.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Folders &amp; Archives</span>
+          <h3>Flatten View, ±2s Tolerance &amp; Sync Hub</h3>
+          <p>Flatten nested hierarchies into one sortable list, handle FAT/SMB timestamp drift (±2s), browse ZIP/TAR virtual trees, and export HTML/CSV audits.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Developer Flow</span>
+          <h3>Command Palette &amp; Git Changeset Browser</h3>
+          <p>Press <kbd>Ctrl+K</kbd> for universal command launch, <kbd>Ctrl+G</kbd> to browse repo changes directly as HEAD vs Working Copy, and configure Git tools in one click.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Privacy &amp; CI/CD</span>
+          <h3>Local-First AI &amp; Headless Reports</h3>
+          <p>Secret Scrubber redacts keys before Ollama/LLM calls. Run CI pipelines with HTML, JSON, Side-by-Side HTML reports, and API contract breaking-change exit codes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="studios" class="section section-alt">
+    <div class="container">
+      <h2 class="section-title">10 Purpose-Built Comparison Studios</h2>
+      <p class="section-sub">Switch tabs below to inspect each specialized engine and UI workflow.</p>
+      <div class="studio-tabs" id="studioTabs">
+        <button class="studio-tab active" data-studio="text">1. Text &amp; Code</button>
+        <button class="studio-tab" data-studio="merge">2. 3-Way Merge</button>
+        <button class="studio-tab" data-studio="folder">3. Folders &amp; VFS</button>
+        <button class="studio-tab" data-studio="image">4. Image, PDF &amp; Docx</button>
+        <button class="studio-tab" data-studio="table">5. Tables &amp; Parquet</button>
+        <button class="studio-tab" data-studio="tree">6. JSON/YAML/XML</button>
+        <button class="studio-tab" data-studio="contract">7. API Contracts</button>
+        <button class="studio-tab" data-studio="hex">8. Hex MMF</button>
+        <button class="studio-tab" data-studio="git">9. Git Hunks &amp; Browser</button>
+        <button class="studio-tab" data-studio="ci">10. Headless CI/CD</button>
+      </div>
+      <div class="studio-detail" id="studioDetail"></div>
+    </div>
+  </section>
+
+  <section id="comparison" class="section">
+    <div class="container">
+      <h2 class="section-title">Feature Matrix vs Commercial Tools</h2>
+      <p class="section-sub">How <strong>diff_and_compare_tool</strong> compares against established commercial desktop suites.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th>diff_and_compare_tool</th>
+              <th>Beyond Compare 5 Pro</th>
+              <th>Araxis Merge Pro</th>
+              <th>Kaleidoscope 5</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>License &amp; Cost</td><td class="yes">Free / MIT Open Source</td><td>Paid Commercial</td><td>Paid Commercial</td><td>Paid Subscription</td></tr>
+            <tr><td>2-Way Text + Line Details + Display Scope Filters</td><td class="yes">✓ Included</td><td class="yes">✓ Included</td><td>Partial</td><td class="yes">✓ Included</td></tr>
+            <tr><td>3-Way Merge + Output Preview + Undo</td><td class="yes">✓ Included</td><td class="yes">✓ (Pro only)</td><td class="yes">✓ Included</td><td class="yes">✓ Included</td></tr>
+            <tr><td>Folder Flatten, Archive VFS &amp; Recycle Bin Sync</td><td class="yes">✓ Included</td><td class="yes">✓ Included</td><td>Folder compare</td><td>Folder compare</td></tr>
+            <tr><td>Tree-sitter AST Semantic Diff (Moved Symbols)</td><td class="yes">✓ Included</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+            <tr><td>API Contract Audit (OpenAPI, GraphQL, Protobuf)</td><td class="yes">✓ + CI JSON/HTML</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+            <tr><td>Word (.docx), Multi-Page PDF &amp; Image RGBA Inspector</td><td class="yes">✓ Included</td><td>Word plugin / basic image</td><td class="yes">✓ Included</td><td>Image/PDF (macOS)</td></tr>
+            <tr><td>Parquet &amp; SQLite Native Diffing + Float Tolerance</td><td class="yes">✓ Included</td><td>CSV/Excel tables</td><td>Excel/CSV</td><td class="no">—</td></tr>
+            <tr><td>Visual Git Hunk Staging &amp; Changeset Browser</td><td class="yes">✓ Included (Ctrl+G)</td><td class="no">—</td><td>SCM compare</td><td>Git changeset</td></tr>
+            <tr><td>Local-First AI Summary + Secret Scrubber</td><td class="yes">✓ Ollama / Zero-Outbound</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="cli" class="section section-alt">
+    <div class="container">
+      <h2 class="section-title">CLI, Git &amp; Headless CI/CD Integration</h2>
+      <p class="section-sub">Launch from Explorer, pipe from stdin, configure as Git difftool/mergetool, or automate release gates.</p>
+
+      <div class="code-card">
+        <div class="code-card-head">
+          <span>Headless Folder, Side-by-Side File &amp; API Contract Audits</span>
+          <button class="copy-btn" data-copy="cli-ci">Copy</button>
+        </div>
+        <pre id="cli-ci">python app/main.py --folder-diff v1/ v2/ --report-html folder_report.html --exit-code
+python app/main.py --diff old.py new.py --report-html file_diff.html --exit-code
+python app/main.py --contract-diff openapi_v1.yaml openapi_v2.yaml --report-json contract.json --report-html contract.html --exit-code</pre>
+      </div>
+
+      <div class="code-card">
+        <div class="code-card-head">
+          <span>Piping from Git Stdin (Zero Temp Files)</span>
+          <button class="copy-btn" data-copy="cli-stdin">Copy</button>
+        </div>
+        <pre id="cli-stdin">git show HEAD~1:app/main.py | python app/main.py --diff - app/main.py</pre>
+      </div>
+
+      <div class="code-card">
+        <div class="code-card-head">
+          <span>Git Difftool &amp; 3-Way Mergetool Configuration (Also 1-Click in Tools Menu)</span>
+          <button class="copy-btn" data-copy="cli-git">Copy</button>
+        </div>
+        <pre id="cli-git">git config --global diff.tool diff_and_compare
+git config --global difftool.diff_and_compare.cmd "diff_and_compare.exe --diff \"$LOCAL\" \"$REMOTE\""
+git config --global merge.tool diff_and_compare
+git config --global mergetool.diff_and_compare.cmd "diff_and_compare.exe --merge \"$LOCAL\" \"$BASE\" \"$REMOTE\" --output \"$MERGED\""</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="shortcuts" class="section">
+    <div class="container">
+      <h2 class="section-title">Keyboard Shortcuts Reference</h2>
+      <p class="section-sub">Power-user navigation across editors, merge conflicts, folders, and the command palette.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Shortcut</th><th>Scope</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td><kbd>Ctrl+K</kbd> / <kbd>Ctrl+Shift+P</kbd></td><td>Global</td><td>Open Command Palette</td></tr>
+            <tr><td><kbd>Ctrl+G</kbd></td><td>Global</td><td>Browse Git Working-Tree Changes (HEAD vs Working Copy)</td></tr>
+            <tr><td><kbd>Ctrl+W</kbd></td><td>Global</td><td>Close active tab (Home tab stays pinned)</td></tr>
+            <tr><td><kbd>F7</kbd> / <kbd>F8</kbd></td><td>2-Way Diff &amp; Hex</td><td>Jump to Previous / Next Difference Hunk</td></tr>
+            <tr><td><kbd>Ctrl+Shift+A</kbd> / <kbd>Ctrl+F7</kbd></td><td>2-Way Diff</td><td>Manual "Align With..." anchor / Clear manual alignments</td></tr>
+            <tr><td><kbd>Ctrl+U</kbd></td><td>2-Way Diff</td><td>Swap Left &amp; Right buffers in-place</td></tr>
+            <tr><td><kbd>Ctrl+F</kbd> / <kbd>Ctrl+H</kbd></td><td>2-Way Diff / Folders</td><td>Open Find &amp; Replace bar / Focus Explorer Search</td></tr>
+            <tr><td><kbd>Alt+Up</kbd> / <kbd>Alt+Down</kbd></td><td>3-Way Merge</td><td>Jump to Previous / Next Conflict</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container" style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px;">
+      <div><strong>diff_and_compare_tool</strong> • MIT License • Windows 11 &amp; Cross-Platform Python/PySide6</div>
+      <div style="display:flex; gap:16px;">
+        <a href="FUNCTIONALITY_GUIDE.md">Functionality Guide</a>
+        <a href="ARCHITECTURE_AND_DESIGN.md">Architecture Spec</a>
+        <a href="https://github.com/vikrantblu/diff_and_compare_tool" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const STUDIOS = {
+      text: {
+        title: "1. 2-Way Text, Code & Word .docx Studio",
+        bullets: [
+          "Myers line diff + diff_match_patch character precision + Needleman-Wunsch section alignment.",
+          "Synchronized bottom Line Details inspector showing stacked char-by-char diffs & delta count.",
+          "Display Scope filter: All Lines, Diffs Only, Context ±3, and Same Only.",
+          "Click header encoding/EOL pill (UTF-8, UTF-8 BOM, UTF-16 LE/BE, Windows-1252, LF/CRLF/CR) & toggle Read-Only lock.",
+          "Custom regex substitution rules persisted across restarts + Ignore Unimportant quick toggle.",
+          "QFileSystemWatcher external file-change banner, Side-by-Side HTML Report export, and 100k+ line virtualization."
+        ]
+      },
+      merge: {
+        title: "2. 3-Way Merge Studio",
+        bullets: [
+          "Synchronized Mine, Base, Theirs viewports + live collapsible Merged Output preview.",
+          "Standard diff3 conflict intervals & markers (<<<<<<< MINE / ||||||| BASE / ======= / >>>>>>> THEIRS).",
+          "One-click Accept Mine, Accept Theirs, Accept Base, Take Both, AI Resolve, and full Undo stack.",
+          "Honors Git mergetool --output destination directly on save."
+        ]
+      },
+      folder: {
+        title: "3. Dual-Tree Folder Compare, Archives VFS & Sync Hub",
+        bullets: [
+          "Flatten toggle merges subfolders into a single sortable list of relative paths.",
+          "Size & Timestamp (±2s FAT/SMB/DST tolerance), BLAKE3, SHA-256, and Rules-Based modes.",
+          "Browse .zip, .jar, .tar, .tgz, .tar.gz archives inline without extracting to disk.",
+          "Interactive Sync Hub with Recycle Bin safe delete, per-row checkboxes, and HTML/CSV report export."
+        ]
+      },
+      image: {
+        title: "4. Visual Media, Multi-Page PDF & Pixel RGBA Studio",
+        bullets: [
+          "Hardware QPainter Swipe Curtain slider, Onion-Skin overlay, Pixel Heatmap, Flicker/Blink, and Side-by-Side.",
+          "Live (X, Y) coordinate and Left vs Right RGBA pixel delta bar on mouse hover.",
+          "Multi-page PDF rasterization + aligned extracted text diff + EXIF/document metadata diff table."
+        ]
+      },
+      table: {
+        title: "5. Tabular, Spreadsheet, Parquet & SQLite Diff",
+        bullets: [
+          "Supports CSV, TSV, Excel (.xlsx sheet selector), Apache Parquet, and SQLite tables.",
+          "Keyed Row Alignment with duplicate-key detection & Floating-Point Tolerance.",
+          "Export filtered diff CSV summaries directly from the command bar."
+        ]
+      },
+      tree: {
+        title: "6. Structured Tree Diff (JSON, YAML, XML)",
+        bullets: [
+          "JSONPath & XPath query filtering plus Semantic Unordered Array matching by entity ID.",
+          "Recursive live search filter, Diffs Only filter, XML tag rename detection, and Copy Path context menu."
+        ]
+      },
+      contract: {
+        title: "7. API Contract Breaking-Change Audit",
+        bullets: [
+          "Analyzes OpenAPI/Swagger, GraphQL SDL, and Protocol Buffers (.proto) schemas.",
+          "Classifies changes into BREAKING, WARNING, and ADDITIVE categories with CI/CD JSON & HTML exports."
+        ]
+      },
+      hex: {
+        title: "8. Virtualized Hex & Binary MMF Inspector",
+        bullets: [
+          "Memory-mapped O(1) viewport model handles multi-GB executables & firmware blobs at 60 FPS.",
+          "Per-byte difference delegate highlights, Go-to-Offset, Find Hex/ASCII pattern, and Live Data Inspector."
+        ]
+      },
+      git: {
+        title: "9. Git Working-Tree Browser & Live Hunk Staging",
+        bullets: [
+          "Press Ctrl+G anywhere to browse modified, staged, and untracked files in your Git repository.",
+          "Open any changed file cleanly as Git HEAD (Read-Only Left) vs Working Copy (Right).",
+          "Stage, unstage, or discard individual hunks straight via git apply --cached."
+        ]
+      },
+      ci: {
+        title: "10. Headless CI/CD Automation & IPC",
+        bullets: [
+          "Standardized exit codes (0 = match, 1 = diff/breaking, 2 = error).",
+          "Side-by-Side HTML, Folder HTML/CSV, and Contract JSON/HTML generation.",
+          "Windows Explorer Select Left / Select Right context menus with Single-Instance Named Pipe IPC."
+        ]
+      }
+    };
+
+    function renderStudio(key) {
+      const s = STUDIOS[key];
+      document.getElementById("studioDetail").innerHTML =
+        `<h3>${s.title}</h3><ul class="studio-list">${s.bullets.map(b => `<li>${b}</li>`).join("")}</ul>`;
+    }
+
+    document.querySelectorAll(".studio-tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".studio-tab").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        renderStudio(btn.dataset.studio);
+      });
+    });
+    renderStudio("text");
+
+    document.querySelectorAll(".copy-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const el = document.getElementById(btn.dataset.copy);
+        if (!el) return;
+        try {
+          await navigator.clipboard.writeText(el.textContent);
+          const orig = btn.textContent;
+          btn.textContent = "Copied!";
+          setTimeout(() => { btn.textContent = orig; }, 1400);
+        } catch (e) {}
+      });
+    });
+  </script>
+</body>
+</html>

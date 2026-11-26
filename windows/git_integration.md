@@ -1,10 +1,17 @@
-# Git Difftool & Mergetool Setup Guide
+# Git Integration, Difftool, Mergetool & Changeset Browser
 
-`diff_and_compare_tool` supports standard CLI flags out-of-the-box, allowing it to serve as your primary `git difftool` and `git mergetool`.
+`diff_and_compare_tool` supports standard CLI flags, a 1-click GUI configurator, a live Git Working-Tree Browser (`Ctrl+G`), and inline hunk staging (`git apply --cached`).
 
 ---
 
-## 1. Configure as `git difftool`
+## 0. 1-Click GUI Setup & Working-Tree Changes Browser
+
+- **1-Click Git Tool Setup**: Inside the app, open **Tools → Configure as Git Difftool & Mergetool...** to automatically register global `diff.tool` and `merge.tool` entries pointing to `diff_and_compare_tool`.
+- **Browse Git Changes (`Ctrl+G`)**: Press `Ctrl+G` anywhere (or click **Browse Git Changes** on Home) to inspect all modified, staged, untracked, and conflicted files in your repository and open any file directly as `Git HEAD (Read-Only) vs Working Copy`.
+
+---
+
+## 1. Configure as `git difftool` via CLI
 
 ### Option A: Standalone Executable (Installed or on PATH)
 ```bash

@@ -9,7 +9,7 @@ Enables live partial commit hunk staging directly from the diff view:
 
 import os
 import subprocess
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict
 from app.core.diff_engine import DiffChunk
 
 
@@ -231,5 +231,139 @@ class GitStagingManager:
             else:
                 err = res.stderr.decode("utf-8", errors="replace").strip()
                 return False, f"Git discard failed: {err}"
+        except Exception as e:
+            return False, str(e)
+
+    @staticmethod
+    def get_working_tree_changes(repo_path: str) -> List[Dict[str, str]]:
+        """
+        Lists modified, staged, untracked, and conflicted files in the Git repository
+        enclosing `repo_path`, for quick opening in DiffView (HEAD vs Working Copy).
+        """
+        root = GitStagingManager.find_git_root(repo_path)
+        if not root:
+            return []
+
+        try:
+            res = subprocess.run(
+                ["git", "status", "--porcelain=v1", "-uall", "-z"],
+                cwd=root,
+                capture_output=True,
+                check=False
+            )
+            if res.returncode != 0:
+                return []
+
+            raw_tokens = res.stdout.split(b"\x00")
+            changes: List[Dict[str, str]] = []
+            idx = 0
+            while idx < len(raw_tokens):
+                tok = raw_tokens[idx]
+                idx += 1
+                if not tok:
+                    continue
+                entry = tok.decode("utf-8", errors="replace")
+                if len(entry) < 4:
+                    continue
+                xy = entry[:2]
+                rel_path = entry[3:].replace("\\", "/")
+                # Renamed/copied porcelain -z records emit a second NUL-delimited original path token
+                if xy[0] in ("R", "C") or xy[1] in ("R", "C"):
+                    if idx < len(raw_tokens):
+                        idx += 1
+
+                if xy == "??":
+                    label = "Untracked"
+                elif "U" in xy or xy in ("AA", "DD"):
+                    label = "Conflict"
+                elif xy[0] != " " and xy[1] != " ":
+                    label = "Staged + Modified"
+                elif xy[0] == "D" or xy[1] == "D":
+                    label = "Deleted"
+                elif xy[0] == "A":
+                    label = "Staged (Added)"
+                elif xy[0] in ("M", "R"):
+                    label = "Staged"
+                else:
+                    label = "Modified"
+
+                abs_path = os.path.normpath(os.path.join(root, rel_path))
+                changes.append({
+                    "status": xy,
+                    "rel_path": rel_path,
+                    "abs_path": abs_path,
+                    "label": label,
+                    "repo_root": root,
+                })
+            return changes
+        except Exception:
+            return []
+
+    @staticmethod
+    def get_git_tool_config_status(scope: str = "global", cwd: Optional[str] = None) -> Dict[str, str]:
+        """Reads current git difftool / mergetool configuration values for UI inspection."""
+        scope_flag = "--local" if scope == "local" else "--global"
+        keys = [
+            "diff.tool",
+            "difftool.diff_and_compare.cmd",
+            "merge.tool",
+            "mergetool.diff_and_compare.cmd",
+        ]
+        result: Dict[str, str] = {}
+        for k in keys:
+            try:
+                res = subprocess.run(
+                    ["git", "config", scope_flag, "--get", k],
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                result[k] = res.stdout.strip() if res.returncode == 0 else ""
+            except Exception:
+                result[k] = ""
+        return result
+
+    @staticmethod
+    def configure_git_difftool_mergetool(
+        exe_command: Optional[str] = None,
+        scope: str = "global",
+        cwd: Optional[str] = None
+    ) -> Tuple[bool, str]:
+        """Registers diff_and_compare_tool as Git's difftool and 3-way mergetool."""
+        if not exe_command:
+            from app.core.shell_integration import get_executable_command
+            exe_command = get_executable_command()
+
+        # Normalize backslashes so MSYS/Git bash executes Windows paths cleanly
+        cmd_prefix = exe_command.replace("\\", "/")
+        scope_flag = "--local" if scope == "local" else "--global"
+
+        diff_cmd = f'{cmd_prefix} --diff "$LOCAL" "$REMOTE"'
+        merge_cmd = f'{cmd_prefix} --merge "$LOCAL" "$BASE" "$REMOTE" --output "$MERGED"'
+
+        settings = [
+            ("diff.tool", "diff_and_compare"),
+            ("difftool.diff_and_compare.cmd", diff_cmd),
+            ("difftool.prompt", "false"),
+            ("merge.tool", "diff_and_compare"),
+            ("mergetool.diff_and_compare.cmd", merge_cmd),
+            ("mergetool.diff_and_compare.trustExitCode", "true"),
+            ("mergetool.prompt", "false"),
+        ]
+
+        try:
+            for key, val in settings:
+                res = subprocess.run(
+                    ["git", "config", scope_flag, key, val],
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if res.returncode != 0:
+                    err = res.stderr.strip() or res.stdout.strip()
+                    return False, f"Failed setting {key}: {err}"
+            return True, f"Configured Git {scope} diff.tool & merge.tool -> diff_and_compare."
         except Exception as e:
             return False, str(e)

@@ -6,7 +6,7 @@ Stores open comparison tabs, recent comparisons, and named comparison profiles.
 import os
 import json
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 
 class SessionManager:
@@ -30,6 +30,10 @@ class SessionManager:
     @classmethod
     def get_recent_file(cls) -> str:
         return os.path.join(cls.get_storage_dir(), "recent_comparisons.json")
+
+    @classmethod
+    def get_custom_rules_file(cls) -> str:
+        return os.path.join(cls.get_storage_dir(), "custom_rules.json")
 
     @classmethod
     def save_session(cls, tabs_data: List[Dict[str, Any]], active_tab_index: int = 0) -> bool:
@@ -140,6 +144,36 @@ class SessionManager:
         try:
             if os.path.exists(filepath):
                 os.remove(filepath)
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def get_custom_noise_rules(cls) -> List[Tuple[str, str]]:
+        """Loads persisted user-defined regex replacement rules for unimportant differences."""
+        filepath = cls.get_custom_rules_file()
+        if not os.path.exists(filepath):
+            return []
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                out: List[Tuple[str, str]] = []
+                for item in data:
+                    if isinstance(item, (list, tuple)) and len(item) >= 2:
+                        out.append((str(item[0]), str(item[1])))
+                return out
+            return []
+        except Exception:
+            return []
+
+    @classmethod
+    def save_custom_noise_rules(cls, rules: List[Tuple[str, str]]) -> bool:
+        """Persists user-defined regex replacement rules to storage directory."""
+        try:
+            payload = [[str(pat), str(repl)] for pat, repl in rules if pat]
+            with open(cls.get_custom_rules_file(), "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
             return True
         except Exception:
             return False

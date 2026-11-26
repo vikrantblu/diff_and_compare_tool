@@ -5,7 +5,8 @@ Displays file paths, real encoding & line-ending badges, save action, drag-and-d
 
 import os
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QLabel, QPushButton, QFileDialog, QMessageBox
+    QWidget, QHBoxLayout, QLabel, QPushButton, QFileDialog, QMessageBox,
+    QToolButton, QMenu
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
@@ -19,6 +20,11 @@ class EditorHeader(QWidget):
 
     fileOpened = Signal(str, str)
     saveRequested = Signal()
+    readOnlyToggled = Signal(bool)
+    encodingFormatChanged = Signal(str, str)  # (encoding, eol)
+
+    SUPPORTED_ENCODINGS = ["UTF-8", "UTF-8 BOM", "UTF-16 LE", "UTF-16 BE", "Windows-1252"]
+    SUPPORTED_EOLS = ["LF", "CRLF", "CR"]
 
     def __init__(self, title: str = "Pane", default_path: str = "Untitled.txt", parent=None):
         super().__init__(parent)
@@ -75,18 +81,39 @@ class EditorHeader(QWidget):
 
         layout.addStretch()
 
-        # Encoding / Line ending badge with border
-        self.lbl_meta = QLabel("UTF-8 | LF")
-        self.lbl_meta.setStyleSheet("""
-            color: #475569;
-            font-size: 11px;
-            background: #f1f5f9;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            padding: 3px 8px;
-            font-weight: 500;
+        # Encoding / Line ending interactive converter button
+        self.btn_meta = QToolButton()
+        self.btn_meta.setText("UTF-8 | LF")
+        self.btn_meta.setPopupMode(QToolButton.InstantPopup)
+        self.btn_meta.setToolTip("Click to convert Encoding or Line Endings (EOL) for saving")
+        self.btn_meta.setStyleSheet("""
+            QToolButton {
+                color: #475569;
+                font-size: 11px;
+                background: #f1f5f9;
+                border: 1px solid #cbd5e1;
+                border-radius: 4px;
+                padding: 3px 8px;
+                font-weight: 500;
+            }
+            QToolButton:hover { background: #e2e8f0; color: #0f172a; }
+            QToolButton::menu-indicator { width: 0px; }
         """)
-        layout.addWidget(self.lbl_meta)
+        self.meta_menu = QMenu(self.btn_meta)
+        self.btn_meta.setMenu(self.meta_menu)
+        self._rebuild_meta_menu()
+        # Preserve attribute alias for callers referencing lbl_meta
+        self.lbl_meta = self.btn_meta
+        layout.addWidget(self.btn_meta)
+
+        # Read-Only Lock Toggle Button
+        self.btn_lock = QPushButton()
+        self.btn_lock.setCheckable(True)
+        self.btn_lock.setIcon(get_line_icon("unlock", "#475569"))
+        self.btn_lock.setFixedSize(28, 28)
+        self.btn_lock.setToolTip("Lock pane as Read-Only to protect baseline against edits or transfers")
+        self.btn_lock.toggled.connect(self._on_lock_toggled)
+        layout.addWidget(self.btn_lock)
 
         # Browse button with line icon
         self.btn_browse = QPushButton(" Browse...")
@@ -122,7 +149,53 @@ class EditorHeader(QWidget):
     def set_encoding_info(self, encoding: str, eol: str):
         self.encoding = encoding or "UTF-8"
         self.eol = eol or "LF"
-        self.lbl_meta.setText(f"{self.encoding} | {self.eol}")
+        self.btn_meta.setText(f"{self.encoding} | {self.eol}")
+        self._rebuild_meta_menu()
+
+    def _rebuild_meta_menu(self):
+        self.meta_menu.clear()
+        enc_sub = self.meta_menu.addMenu("Encoding")
+        for enc in self.SUPPORTED_ENCODINGS:
+            act = enc_sub.addAction(enc)
+            act.setCheckable(True)
+            act.setChecked(enc == self.encoding)
+            act.triggered.connect(lambda _=False, e=enc: self._change_encoding(e))
+
+        eol_sub = self.meta_menu.addMenu("Line Endings (EOL)")
+        for eol in self.SUPPORTED_EOLS:
+            act = eol_sub.addAction(eol)
+            act.setCheckable(True)
+            act.setChecked(eol == self.eol)
+            act.triggered.connect(lambda _=False, el=eol: self._change_eol(el))
+
+    def _change_encoding(self, new_enc: str):
+        if new_enc != self.encoding:
+            self.set_encoding_info(new_enc, self.eol)
+            self.set_dirty(True)
+            self.encodingFormatChanged.emit(self.encoding, self.eol)
+
+    def _change_eol(self, new_eol: str):
+        if new_eol != self.eol:
+            self.set_encoding_info(self.encoding, new_eol)
+            self.set_dirty(True)
+            self.encodingFormatChanged.emit(self.encoding, self.eol)
+
+    def set_read_only(self, locked: bool):
+        self.btn_lock.setChecked(locked)
+
+    def is_read_only(self) -> bool:
+        return self.btn_lock.isChecked()
+
+    def _on_lock_toggled(self, checked: bool):
+        if checked:
+            self.btn_lock.setIcon(get_line_icon("lock", "#b45309"))
+            self.btn_lock.setStyleSheet("background: #fef3c7; border: 1px solid #f59e0b; border-radius: 5px;")
+            self.btn_lock.setToolTip("Pane Locked (Read-Only) — click to unlock editing")
+        else:
+            self.btn_lock.setIcon(get_line_icon("unlock", "#475569"))
+            self.btn_lock.setStyleSheet("")
+            self.btn_lock.setToolTip("Lock pane as Read-Only to protect baseline against edits or transfers")
+        self.readOnlyToggled.emit(checked)
 
     def set_diff_stats(self, added: int, deleted: int, modified: int):
         parts = []

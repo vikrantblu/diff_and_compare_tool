@@ -30,13 +30,16 @@ from app.ui.tabular_diff_view import TabularDiffView
 from app.ui.structured_diff_view import StructuredDiffView
 from app.ui.hex_diff_view import HexDiffView
 from app.ui.dialogs.session_dialog import SessionProfileDialog
+from app.ui.dialogs.command_palette import CommandPaletteDialog
+from app.ui.dialogs.git_changes_dialog import GitChangesDialog
 
 from app.ui.styles.theme import MODERN_LIGHT_QSS
 from app.ui.styles.icons import get_line_icon, get_app_icon
 from app.ui.styles.windows_effects import apply_windows_material, BACKDROP_MICA_ALT
 from app.core.session_manager import SessionManager
 from app.core.archive_vfs import ArchiveVFS
-from app.core.file_io import is_vfs_path
+from app.core.file_io import is_vfs_path, is_docx_path, read_text_file
+from app.core.git_staging import GitStagingManager
 from app.core.shell_integration import install_context_menu, uninstall_context_menu
 
 
@@ -86,6 +89,9 @@ class MainWindow(QMainWindow):
         self.setup_menu()
         self.setup_status_bar()
         QShortcut(QKeySequence("Ctrl+W"), self, self._close_current_tab)
+        QShortcut(QKeySequence("Ctrl+K"), self, self.open_command_palette)
+        QShortcut(QKeySequence("Ctrl+Shift+P"), self, self.open_command_palette)
+        QShortcut(QKeySequence("Ctrl+G"), self, self.open_git_changes_browser)
 
         self._restore_session_if_available()
         self._check_crash_recovery()
@@ -108,6 +114,7 @@ class MainWindow(QMainWindow):
         self.home_tab.sessionSelected.connect(self._on_home_session_selected)
         self.home_tab.compareFilesRequested.connect(self.smart_open_comparison)
         self.home_tab.clipboardCompareRequested.connect(self._compare_clipboard)
+        self.home_tab.gitChangesRequested.connect(self.open_git_changes_browser)
         self._update_tab_close_buttons()
 
         c_row = QWidget()
@@ -137,6 +144,13 @@ class MainWindow(QMainWindow):
 
         self.btn_new_tab.setMenu(new_menu)
         r_layout.addWidget(self.btn_new_tab)
+
+        self.btn_commands = QPushButton(" Commands")
+        self.btn_commands.setIcon(get_line_icon("command", "#0969da"))
+        self.btn_commands.setFixedHeight(28)
+        self.btn_commands.setToolTip("Open Command Palette (Ctrl+K)")
+        self.btn_commands.clicked.connect(self.open_command_palette)
+        r_layout.addWidget(self.btn_commands)
 
         self.btn_profiles = QPushButton(" Workspaces")
         self.btn_profiles.setIcon(get_line_icon("folder", "#475569"))
@@ -527,7 +541,11 @@ class MainWindow(QMainWindow):
         menu_session.addAction("Exit").triggered.connect(self.close)
 
         menu_tools = menubar.addMenu("&Tools")
+        menu_tools.addAction(get_line_icon("command", "#0969da"), "Command Palette... (Ctrl+K)").triggered.connect(self.open_command_palette)
+        menu_tools.addAction(get_line_icon("git-branch", "#1a7f37"), "Browse Git Working Changes... (Ctrl+G)").triggered.connect(self.open_git_changes_browser)
         menu_tools.addAction(get_line_icon("clipboard", "#0969da"), "Compare Clipboard in Text Studio").triggered.connect(self._compare_clipboard)
+        menu_tools.addSeparator()
+        menu_tools.addAction(get_line_icon("terminal", "#475569"), "Configure as Git Difftool & Mergetool...").triggered.connect(self._configure_git_tools)
         if sys.platform == "win32":
             menu_tools.addSeparator()
             menu_tools.addAction(get_line_icon("check", "#16a34a"), "Install Windows Explorer Menu ('Select Left', 'Select Right')").triggered.connect(self._install_shell_menu)
@@ -592,6 +610,10 @@ class MainWindow(QMainWindow):
                 self.open_folder_diff(left_path, right_path)
                 return
 
+        if is_docx_path(left_path or "") or is_docx_path(right_path or ""):
+            self.open_file_diff(left_path, right_path, left_title=left_title, right_title=right_title)
+            return
+
         ext = os.path.splitext(left_path or right_path)[1].lower()
         if ext in {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".svg", ".tiff", ".ico", ".pdf"}:
             self.open_image_diff(left_path, right_path)
@@ -605,6 +627,122 @@ class MainWindow(QMainWindow):
             self.open_hex_diff(left_path, right_path)
         else:
             self.open_file_diff(left_path, right_path, left_title=left_title, right_title=right_title)
+
+    def build_command_palette_entries(self) -> list:
+        """Collects studio launchers, Git workflows, active-tab actions, and recent comparisons."""
+        cmds = [
+            ("New 2-Way Text & Code Diff", "Studio", "", lambda: self.add_new_tab("text")),
+            ("New 3-Way Merge Studio", "Studio", "", lambda: self.add_new_tab("merge")),
+            ("New Folder / Archive Comparison", "Studio", "", lambda: self.add_new_tab("folder")),
+            ("New Image & PDF Visual Diff", "Studio", "", lambda: self.add_new_tab("image")),
+            ("New Tabular / Spreadsheet Diff", "Studio", "", lambda: self.add_new_tab("table")),
+            ("New Structured Data Tree Diff (JSON/YAML/XML)", "Studio", "", lambda: self.add_new_tab("structured")),
+            ("New API Contract Audit (OpenAPI/GraphQL/Proto)", "Studio", "", lambda: self.add_new_tab("contract")),
+            ("New Hex & Binary Inspector", "Studio", "", lambda: self.add_new_tab("hex")),
+            ("Browse Git Working-Tree Changes", "Git", "Ctrl+G", self.open_git_changes_browser),
+            ("Configure as Git Difftool & Mergetool", "Git", "", self._configure_git_tools),
+            ("Compare Clipboard in Text Studio", "Tools", "", self._compare_clipboard),
+            ("Manage Workspace Profiles", "Workspace", "", self._open_profiles_dialog),
+            ("Go to Home Dashboard", "Navigation", "", self.show_home_tab),
+        ]
+
+        cur = self.tabs.currentWidget()
+        if isinstance(cur, DiffView):
+            cmds.extend([
+                ("Next Difference Hunk", "Text Diff", "F8", cur.jump_next),
+                ("Previous Difference Hunk", "Text Diff", "F7", cur.jump_prev),
+                ("Swap Left & Right Buffers", "Text Diff", "Ctrl+U", cur.swap_sides),
+                ("Open Find & Replace Bar", "Text Diff", "Ctrl+F", cur.open_find_bar),
+                ("Export Side-by-Side HTML Report", "Text Diff", "", cur._export_html_report),
+                ("Export Unified .patch", "Text Diff", "", cur._export_patch),
+                ("Copy Unified Diff to Clipboard", "Text Diff", "", cur._copy_unified_diff),
+                ("Compare Active File with Git HEAD", "Text Diff", "", cur.compare_with_git_head),
+                ("Configure Noise / Unimportant Rules", "Text Diff", "", cur._open_noise_filters),
+            ])
+        elif isinstance(cur, DirCompareView):
+            cmds.extend([
+                ("Open Folder Sync Hub", "Folder Diff", "", cur._open_sync_dialog),
+                ("Export Folder HTML Report", "Folder Diff", "", cur._export_folder_html),
+                ("Export Folder CSV Summary", "Folder Diff", "", cur._export_folder_csv),
+                ("Toggle Flatten Folders View", "Folder Diff", "", cur.btn_flatten.click),
+            ])
+
+        for rec in SessionManager.get_recent_comparisons(limit=6):
+            lp = rec.get("left_path", "")
+            rp = rec.get("right_path", "")
+            if lp and rp:
+                cmds.append((
+                    f"{os.path.basename(lp)} ↔ {os.path.basename(rp)}",
+                    "Recent",
+                    "",
+                    lambda l=lp, r=rp: self.smart_open_comparison(l, r)
+                ))
+        return cmds
+
+    def open_command_palette(self):
+        dlg = CommandPaletteDialog(self.build_command_palette_entries(), parent=self)
+        dlg.exec()
+
+    def _active_repo_hint(self) -> str:
+        cur = self.tabs.currentWidget()
+        if isinstance(cur, DiffView):
+            p = cur.right_header.current_file_path or cur.left_header.current_file_path
+            if p and os.path.exists(p):
+                return p
+        elif isinstance(cur, DirCompareView):
+            p = cur.txt_left_path.text().strip() or cur.txt_right_path.text().strip()
+            if p and os.path.exists(p):
+                return p
+        return os.getcwd()
+
+    def open_git_changes_browser(self):
+        dlg = GitChangesDialog(initial_path=self._active_repo_hint(), parent=self)
+        dlg.openGitFileDiff.connect(self._open_git_head_diff)
+        dlg.exec()
+
+    def _open_git_head_diff(self, abs_path: str):
+        tab = self.open_file_diff()
+        tab._is_sample_state = False
+        head_content = GitStagingManager.get_git_head_content(abs_path) or ""
+        if os.path.isfile(abs_path):
+            working_content, enc, eol = read_text_file(abs_path)
+        else:
+            working_content, enc, eol = "", "UTF-8", "LF"
+        tab._raw_left = head_content
+        tab._raw_right = working_content
+        tab.left_header.set_file_info(abs_path, dirty=False, display_title=f"{os.path.basename(abs_path)} (Git HEAD)")
+        tab.left_header.set_encoding_info(enc, eol)
+        tab.left_header.set_read_only(True)
+        tab.right_header.set_file_info(abs_path, dirty=False)
+        tab.right_header.set_encoding_info(enc, eol)
+        tab.right_header.set_read_only(False)
+        tab.left_editor.set_language_from_path(abs_path)
+        tab.right_editor.set_language_from_path(abs_path)
+        tab._update_watched_files()
+        tab.run_diff()
+        self._update_widget_tab_title(tab, f"{abs_path} (HEAD)", abs_path, " Git HEAD Diff")
+        self.lbl_status.setText(f"  ● Loaded Git HEAD vs Working Copy: {os.path.basename(abs_path)}")
+
+    def _configure_git_tools(self):
+        status = GitStagingManager.get_git_tool_config_status()
+        cur_diff = status.get("diff.tool") or "(unset)"
+        cur_merge = status.get("merge.tool") or "(unset)"
+        reply = QMessageBox.question(
+            self,
+            "Configure Git Difftool & Mergetool",
+            f"Current global git diff.tool = {cur_diff}\nCurrent global git merge.tool = {cur_merge}\n\n"
+            f"Set diff_and_compare_tool as your global Git difftool and 3-way mergetool?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
+        )
+        if reply != QMessageBox.Yes:
+            return
+        ok, msg = GitStagingManager.configure_git_difftool_mergetool()
+        if ok:
+            QMessageBox.information(self, "Git Integration Configured", msg)
+            self.lbl_status.setText(f"  ● {msg}")
+        else:
+            QMessageBox.warning(self, "Git Configuration Failed", msg)
 
     def _record_recent(self, left_path: str, right_path: str, mode: str):
         if left_path and right_path and os.path.exists(left_path) and os.path.exists(right_path):

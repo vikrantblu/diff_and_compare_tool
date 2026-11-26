@@ -39,6 +39,7 @@ class ImageCanvas(QWidget):
     curtainMoved = Signal(float)
     zoomChanged = Signal(float)
     filesDropped = Signal(list)
+    pixelHovered = Signal(int, int)
 
     def __init__(self):
         super().__init__()
@@ -166,6 +167,31 @@ class ImageCanvas(QWidget):
     def mouseMoveEvent(self, event):
         if self.is_dragging_curtain and self.mode == 0:
             self._update_curtain_from_pos(event.pos())
+
+        if self.pm_left and not self.pm_left.isNull():
+            bw, bh = self._base_size()
+            target_w = int(bw * self.zoom_factor)
+            target_h = int(bh * self.zoom_factor)
+            x0 = max(0, (self.width() - target_w) // 2)
+            y0 = max(0, (self.height() - target_h) // 2)
+            px = event.pos().x() - x0
+            py = event.pos().y() - y0
+            if 0 <= py < target_h:
+                if self.mode == 4:
+                    single_w = int(self.pm_left.width() * self.zoom_factor)
+                    gap = max(2, int(6 * self.zoom_factor))
+                    if 0 <= px < single_w:
+                        ix = int(px / max(0.01, self.zoom_factor))
+                        iy = int(py / max(0.01, self.zoom_factor))
+                        self.pixelHovered.emit(ix, iy)
+                    elif (single_w + gap) <= px < (single_w * 2 + gap):
+                        ix = int((px - single_w - gap) / max(0.01, self.zoom_factor))
+                        iy = int(py / max(0.01, self.zoom_factor))
+                        self.pixelHovered.emit(ix, iy)
+                elif 0 <= px < target_w:
+                    ix = int(px / max(0.01, self.zoom_factor))
+                    iy = int(py / max(0.01, self.zoom_factor))
+                    self.pixelHovered.emit(ix, iy)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -406,6 +432,7 @@ class ImageDiffView(QWidget):
         self.canvas.curtainMoved.connect(self._on_curtain_dragged)
         self.canvas.zoomChanged.connect(lambda z: self.btn_zoom_100.setText(f"{int(round(z * 100))}%"))
         self.canvas.filesDropped.connect(self._on_canvas_files_dropped)
+        self.canvas.pixelHovered.connect(self._on_pixel_hovered)
         self.scroll_area.setWidget(self.canvas)
         self.viewport_stack.addWidget(self.scroll_area)
 
@@ -455,6 +482,34 @@ class ImageDiffView(QWidget):
         self.main_splitter.setSizes([500, 200])
 
         layout.addWidget(self.main_splitter, 1)
+
+        # Bottom Live Pixel RGBA Inspector Bar
+        pixel_bar = QFrame()
+        pixel_bar.setFixedHeight(26)
+        pixel_bar.setStyleSheet("QFrame { background: #f8fafc; border-top: 1px solid #cbd5e1; padding: 0 10px; }")
+        pb_layout = QHBoxLayout(pixel_bar)
+        pb_layout.setContentsMargins(8, 0, 8, 0)
+        self.lbl_pixel_info = QLabel("Hover over the image canvas to inspect (X, Y) RGBA pixel values and deltas")
+        self.lbl_pixel_info.setStyleSheet("font-family: Consolas, monospace; font-size: 11px; color: #334155; border: none; background: transparent;")
+        pb_layout.addWidget(self.lbl_pixel_info)
+        layout.addWidget(pixel_bar)
+
+    def _on_pixel_hovered(self, x: int, y: int):
+        if not self.diff_result:
+            return
+        img1 = self.diff_result.img1
+        img2 = self.diff_result.img2
+        if not (0 <= x < img1.width and 0 <= y < img1.height):
+            return
+        p1 = img1.convert("RGBA").getpixel((x, y)) if img1.mode != "RGBA" else img1.getpixel((x, y))
+        if 0 <= x < img2.width and 0 <= y < img2.height:
+            p2 = img2.convert("RGBA").getpixel((x, y)) if img2.mode != "RGBA" else img2.getpixel((x, y))
+            dr, dg, db, da = abs(p1[0] - p2[0]), abs(p1[1] - p2[1]), abs(p1[2] - p2[2]), abs(p1[3] - p2[3])
+            self.lbl_pixel_info.setText(
+                f"({x}, {y})  |  Left: rgba{p1}  |  Right: rgba{p2}  |  ΔRGBA: ({dr}, {dg}, {db}, {da})"
+            )
+        else:
+            self.lbl_pixel_info.setText(f"({x}, {y})  |  Left: rgba{p1}  |  Right: out of bounds")
 
     def _sync_text_left(self, val: int):
         if not self._is_syncing_text_scroll:

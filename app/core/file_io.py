@@ -3,9 +3,75 @@ File I/O, Encoding, Line-Ending Detection, and Virtual Archive Path Utilities.
 Supports local filesystem files and ArchiveVFS virtual paths (e.g. `bundle.zip#src/main.py`).
 """
 
+import io
 import os
+import zipfile
 from typing import Tuple
 from app.core.archive_vfs import ArchiveVFS
+
+try:
+    import defusedxml.ElementTree as DET
+except ImportError:  # pragma: no cover
+    import xml.etree.ElementTree as DET
+
+
+def is_docx_path(path: str) -> bool:
+    """Returns True if path (local or VFS) refers to a Microsoft Word .docx file."""
+    return bool(path) and path.lower().endswith(".docx")
+
+
+def _extract_docx_paragraph(p_elem) -> str:
+    """Extracts readable text from a WordprocessingML paragraph element."""
+    parts = []
+    for node in p_elem.iter():
+        tag = node.tag.rsplit("}", 1)[-1]
+        if tag == "t" and node.text:
+            parts.append(node.text)
+        elif tag == "tab":
+            parts.append("\t")
+        elif tag in ("br", "cr"):
+            parts.append("\n")
+    return "".join(parts)
+
+
+def extract_docx_text(path: str) -> str:
+    """Extracts paragraphs and tables from a .docx archive without third-party Word deps."""
+    raw_bytes = read_vfs_or_file_bytes(path)
+    with zipfile.ZipFile(io.BytesIO(raw_bytes), "r") as zf:
+        if "word/document.xml" not in zf.namelist():
+            raise ValueError("Invalid .docx archive: missing word/document.xml")
+        xml_bytes = zf.read("word/document.xml")
+
+    root = DET.fromstring(xml_bytes)
+    body = None
+    for child in root:
+        if child.tag.rsplit("}", 1)[-1] == "body":
+            body = child
+            break
+    if body is None:
+        return ""
+
+    lines = []
+    for elem in body:
+        local = elem.tag.rsplit("}", 1)[-1]
+        if local == "p":
+            lines.append(_extract_docx_paragraph(elem))
+        elif local == "tbl":
+            for tr in elem:
+                if tr.tag.rsplit("}", 1)[-1] != "tr":
+                    continue
+                row_cells = []
+                for tc in tr:
+                    if tc.tag.rsplit("}", 1)[-1] != "tc":
+                        continue
+                    cell_paras = [
+                        _extract_docx_paragraph(p)
+                        for p in tc
+                        if p.tag.rsplit("}", 1)[-1] == "p"
+                    ]
+                    row_cells.append(" ".join(c for c in cell_paras if c))
+                lines.append("\t".join(row_cells))
+    return "\n".join(lines)
 
 
 def is_vfs_path(path: str) -> bool:
@@ -82,9 +148,11 @@ def detect_eol(text: str) -> str:
 
 def read_text_file(path: str) -> Tuple[str, str, str]:
     """
-    Reads a local or VFS text file and returns `(decoded_text, encoding_label, eol_label)`.
+    Reads a local, VFS, or .docx document file and returns `(decoded_text, encoding_label, eol_label)`.
     Preserves UTF-8 BOM / UTF-16 / CP1252 detection for faithful saving.
     """
+    if is_docx_path(path):
+        return extract_docx_text(path), "DOCX (Extracted)", "LF"
     raw_bytes = read_vfs_or_file_bytes(path)
     enc = detect_encoding(raw_bytes)
     if enc == "utf-16-le":

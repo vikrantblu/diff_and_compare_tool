@@ -135,7 +135,8 @@ class FolderCompareEngine:
         mode: str = "hash",          # "hash", "timestamp", "rules", "blake3"
         filter_expr: str = "",       # e.g. "*.py", "-*.tmp", "-kb_*.*"
         progress_callback = None,    # Callable[[int, str], None]
-        respect_gitignore: bool = True
+        respect_gitignore: bool = True,
+        timestamp_tolerance_sec: float = 2.0
     ) -> List[FolderCompareItem]:
         """
         Recursively scans left_dir and right_dir, producing a hierarchical
@@ -213,7 +214,8 @@ class FolderCompareEngine:
                 it.left_path, it.right_path,
                 it.left_size or 0, it.right_size or 0,
                 it.left_mtime or 0.0, it.right_mtime or 0.0,
-                mode
+                mode,
+                timestamp_tolerance_sec=timestamp_tolerance_sec
             )
             return it, st, reason
 
@@ -347,16 +349,17 @@ class FolderCompareEngine:
         l_path: str, r_path: str,
         l_size: int, r_size: int,
         l_mtime: float, r_mtime: float,
-        mode: str
+        mode: str,
+        timestamp_tolerance_sec: float = 2.0
     ) -> Tuple[str, str]:
         """Compares two files (including ArchiveVFS entries) and returns (status, reason)."""
         if mode == "timestamp":
             if l_size != r_size:
                 return "DIFF", f"Size differs ({l_size:,} vs {r_size:,})"
-            if abs(l_mtime - r_mtime) > 2.0:
+            if abs(l_mtime - r_mtime) > max(0.0, float(timestamp_tolerance_sec)):
                 newer = "Left" if l_mtime > r_mtime else "Right"
                 return "DIFF", f"Modified date differs ({newer} newer)"
-            return "SAME", "Size & timestamp match"
+            return "SAME", f"Size & timestamp match (±{timestamp_tolerance_sec:g}s)"
 
         if mode == "rules":
             try:
@@ -466,6 +469,23 @@ class FolderCompareEngine:
         # Organize by folders first, then files
         FolderCompareEngine._sort_tree(root_items)
         return root_items
+
+    @staticmethod
+    def flatten_tree(items: List[FolderCompareItem]) -> List[FolderCompareItem]:
+        """Collects all non-directory leaf items across the tree sorted by relative path."""
+        leaves: List[FolderCompareItem] = []
+
+        def _walk(nodes: List[FolderCompareItem]):
+            for node in nodes:
+                if node.is_dir:
+                    if node.children:
+                        _walk(node.children)
+                else:
+                    leaves.append(node)
+
+        _walk(items)
+        leaves.sort(key=lambda it: it.rel_path.lower())
+        return leaves
 
     @staticmethod
     def find_subfolder_match(left_dir: str, right_dir: str) -> Optional[Tuple[str, str, str]]:

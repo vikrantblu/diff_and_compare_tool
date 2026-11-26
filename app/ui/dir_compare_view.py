@@ -15,7 +15,7 @@ from typing import Optional, List
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
     QPushButton, QLineEdit, QComboBox, QLabel, QFileDialog, QHeaderView,
-    QSplitter, QFrame, QButtonGroup, QMessageBox, QMenu,
+    QSplitter, QFrame, QButtonGroup, QMessageBox, QMenu, QToolButton,
     QProgressBar, QApplication, QCheckBox, QStyledItemDelegate, QStyle
 )
 from PySide6.QtCore import Qt, Signal, QThread, QRect, QSize
@@ -25,6 +25,7 @@ from app.ui.styles.icons import get_line_icon
 from app.core.folder_compare_engine import FolderCompareEngine, FolderCompareItem
 from app.core.archive_vfs import ArchiveVFS
 from app.core.file_io import is_vfs_path, read_vfs_or_file_bytes
+from app.core.headless_reporter import HeadlessReporter
 from app.ui.dialogs.folder_sync_dialog import FolderSyncDialog
 
 
@@ -34,13 +35,14 @@ class FolderCompareWorker(QThread):
     finished = Signal(list, str, str)  # items, left_dir, right_dir
     failed = Signal(str)
 
-    def __init__(self, left_dir: str, right_dir: str, mode: str, filter_expr: str, respect_gitignore: bool = True):
+    def __init__(self, left_dir: str, right_dir: str, mode: str, filter_expr: str, respect_gitignore: bool = True, timestamp_tolerance_sec: float = 2.0):
         super().__init__()
         self.left_dir = left_dir
         self.right_dir = right_dir
         self.mode = mode
         self.filter_expr = filter_expr
         self.respect_gitignore = respect_gitignore
+        self.timestamp_tolerance_sec = timestamp_tolerance_sec
         self._is_cancelled = False
 
     def cancel(self):
@@ -69,7 +71,8 @@ class FolderCompareWorker(QThread):
                 mode=self.mode,
                 filter_expr=self.filter_expr,
                 progress_callback=cb,
-                respect_gitignore=self.respect_gitignore
+                respect_gitignore=self.respect_gitignore,
+                timestamp_tolerance_sec=self.timestamp_tolerance_sec
             )
             if not self._is_cancelled:
                 self.progress.emit(last_emit_count, "Comparison scan complete.")
@@ -174,6 +177,7 @@ class DirCompareView(QWidget):
         self._worker: Optional[FolderCompareWorker] = None
         self._cached_items: List[FolderCompareItem] = []
         self._diff_nav_index = -1
+        self._is_flattened = False
 
         self.setup_ui()
         if self.current_filter_mode == "diffs":
@@ -259,7 +263,7 @@ class DirCompareView(QWidget):
         self.combo_rules.addItems([
             "Byte-by-Byte (SHA-256)",
             "BLAKE3 (Ultra-Fast Hash)",
-            "Size & Timestamp Match",
+            "Size & Timestamp (±2s)",
             "Rules-Based (Ignore Whitespace)"
         ])
         self.combo_rules.currentIndexChanged.connect(self.run_comparison)
@@ -295,6 +299,14 @@ class DirCompareView(QWidget):
         self.btn_collapse.clicked.connect(self._collapse_all)
         r_layout.addWidget(self.btn_collapse)
 
+        self.btn_flatten = QPushButton(" Flatten")
+        self.btn_flatten.setIcon(get_line_icon("list", "#1e293b"))
+        self.btn_flatten.setCheckable(True)
+        self.btn_flatten.setFixedHeight(30)
+        self.btn_flatten.setToolTip("Show all files in a flat list across folders (preserves relative paths)")
+        self.btn_flatten.toggled.connect(self._on_flatten_toggled)
+        r_layout.addWidget(self.btn_flatten)
+
         self.btn_swap = QPushButton(" Swap")
         self.btn_swap.setIcon(get_line_icon("swap", "#1e293b"))
         self.btn_swap.setFixedHeight(30)
@@ -313,6 +325,17 @@ class DirCompareView(QWidget):
         self.btn_sync.setToolTip("Open interactive folder synchronization hub (Mirror, Bi-directional, Update)")
         self.btn_sync.clicked.connect(self._open_sync_dialog)
         r_layout.addWidget(self.btn_sync)
+
+        self.btn_export_report = QToolButton()
+        self.btn_export_report.setText(" Report")
+        self.btn_export_report.setIcon(get_line_icon("download", "#1e293b"))
+        self.btn_export_report.setFixedHeight(30)
+        self.btn_export_report.setPopupMode(QToolButton.InstantPopup)
+        rep_menu = QMenu(self.btn_export_report)
+        rep_menu.addAction(get_line_icon("file-code", "#0969da"), "Export HTML Folder Report...", self._export_folder_html)
+        rep_menu.addAction(get_line_icon("table", "#1a7f37"), "Export CSV Summary...", self._export_folder_csv)
+        self.btn_export_report.setMenu(rep_menu)
+        r_layout.addWidget(self.btn_export_report)
 
         r_layout.addSpacing(4)
 
@@ -542,6 +565,10 @@ class DirCompareView(QWidget):
         self.btn_cancel_comparison.setVisible(False)
         sb_layout.addWidget(self.btn_cancel_comparison)
 
+        self.lbl_summary_badges = QLabel("")
+        self.lbl_summary_badges.setStyleSheet("font-size: 11px; border: none; background: transparent;")
+        sb_layout.addWidget(self.lbl_summary_badges)
+
         self.lbl_stats = QLabel("0 files | 0 differences")
         self.lbl_stats.setStyleSheet("font-size: 11px; font-weight: 700; color: #0969da; border: none; background: transparent;")
         sb_layout.addWidget(self.lbl_stats)
@@ -674,6 +701,44 @@ class DirCompareView(QWidget):
         self._populate_dual_trees(items)
         self._check_smart_suggestion(left, right)
 
+    def _on_flatten_toggled(self, checked: bool):
+        self._is_flattened = checked
+        if self._cached_items:
+            self.tree_left.clear()
+            self.tree_gutter.clear()
+            self.tree_right.clear()
+            self._populate_dual_trees(self._cached_items)
+
+    def _export_folder_html(self):
+        if not self._cached_items:
+            QMessageBox.information(self, "No Data", "Run a folder comparison before exporting a report.")
+            return
+        file, _ = QFileDialog.getSaveFileName(self, "Export Folder Comparison HTML Report", "folder_report.html", "HTML Files (*.html)")
+        if not file:
+            return
+        flat_items = FolderCompareEngine.flatten_tree(self._cached_items)
+        diffs = sum(1 for it in flat_items if it.status == "DIFF")
+        l_only = sum(1 for it in flat_items if it.status == "LEFT_ONLY")
+        r_only = sum(1 for it in flat_items if it.status == "RIGHT_ONLY")
+        same = sum(1 for it in flat_items if it.status == "SAME")
+        exit_code = 1 if (diffs or l_only or r_only) else 0
+        HeadlessReporter._generate_folder_html_report(
+            self.left_dir, self.right_dir, flat_items, file,
+            len(flat_items), diffs, l_only, r_only, same, exit_code
+        )
+        self.lbl_log.setText(f"● Exported HTML report: {os.path.basename(file)}")
+
+    def _export_folder_csv(self):
+        if not self._cached_items:
+            QMessageBox.information(self, "No Data", "Run a folder comparison before exporting a report.")
+            return
+        file, _ = QFileDialog.getSaveFileName(self, "Export Folder Comparison CSV", "folder_summary.csv", "CSV Files (*.csv)")
+        if not file:
+            return
+        flat_items = FolderCompareEngine.flatten_tree(self._cached_items)
+        HeadlessReporter.generate_folder_csv_report(flat_items, file)
+        self.lbl_log.setText(f"● Exported CSV summary: {os.path.basename(file)}")
+
     def _check_smart_suggestion(self, left: str, right: str):
         match = FolderCompareEngine.find_subfolder_match(left, right)
         if match:
@@ -720,17 +785,32 @@ class DirCompareView(QWidget):
 
         total_files = 0
         diff_count = 0
+        left_only_count = 0
+        right_only_count = 0
         same_count = 0
 
-        def add_items(parent_l, parent_g, parent_r, child_items):
-            nonlocal total_files, diff_count, same_count
-            for it in child_items:
+        def count_items(node_list):
+            nonlocal total_files, diff_count, left_only_count, right_only_count, same_count
+            for it in node_list:
                 if not it.is_dir:
                     total_files += 1
                     if it.status == "SAME":
                         same_count += 1
+                    elif it.status == "LEFT_ONLY":
+                        left_only_count += 1
+                    elif it.status == "RIGHT_ONLY":
+                        right_only_count += 1
                     else:
                         diff_count += 1
+                if it.children:
+                    count_items(it.children)
+
+        count_items(items)
+        display_items = FolderCompareEngine.flatten_tree(items) if self._is_flattened else items
+
+        def add_items(parent_l, parent_g, parent_r, child_items):
+            for it in child_items:
+                label_name = it.rel_path if self._is_flattened else it.name
 
                 node_l = QTreeWidgetItem(parent_l)
                 node_r = QTreeWidgetItem(parent_r)
@@ -749,8 +829,8 @@ class DirCompareView(QWidget):
                 node_g.setData(0, Qt.UserRole + 1, (node_l, node_r))
 
                 if it.left_path:
-                    icon_prefix = "📁 " if it.is_dir else "   "
-                    node_l.setText(0, f"{icon_prefix}{it.name}")
+                    icon_prefix = "📁 " if it.is_dir else ("   " if not self._is_flattened else "")
+                    node_l.setText(0, f"{icon_prefix}{label_name}")
                     node_l.setText(1, it.left_size_str)
                     node_l.setText(2, it.left_mtime_str)
                 else:
@@ -758,8 +838,8 @@ class DirCompareView(QWidget):
                     node_l.setChildIndicatorPolicy(QTreeWidgetItem.ChildIndicatorPolicy.DontShowIndicator)
 
                 if it.right_path:
-                    icon_prefix = "📁 " if it.is_dir else "   "
-                    node_r.setText(0, f"{icon_prefix}{it.name}")
+                    icon_prefix = "📁 " if it.is_dir else ("   " if not self._is_flattened else "")
+                    node_r.setText(0, f"{icon_prefix}{label_name}")
                     node_r.setText(1, it.right_size_str)
                     node_r.setText(2, it.right_mtime_str)
                 else:
@@ -794,10 +874,10 @@ class DirCompareView(QWidget):
                     node_l.setForeground(0, QColor("#475569"))
                     node_r.setForeground(0, QColor("#475569"))
 
-                if it.children:
+                if it.children and not self._is_flattened:
                     add_items(node_l, node_g, node_r, it.children)
 
-        add_items(self.tree_left, self.tree_gutter, self.tree_right, items)
+        add_items(self.tree_left, self.tree_gutter, self.tree_right, display_items)
 
         self.tree_left.setUpdatesEnabled(True)
         self.tree_gutter.setUpdatesEnabled(True)
@@ -807,7 +887,7 @@ class DirCompareView(QWidget):
         self.tree_gutter.blockSignals(False)
         self.tree_right.blockSignals(False)
 
-        if len(items) <= 50:
+        if not self._is_flattened and len(items) <= 50:
             self._is_syncing_expand = True
             for i in range(self.tree_left.topLevelItemCount()):
                 it_l = self.tree_left.topLevelItem(i)
@@ -821,8 +901,16 @@ class DirCompareView(QWidget):
                         it_r.setExpanded(True)
             self._is_syncing_expand = False
 
-        self._cached_stats_text = f"{total_files:,} files | {diff_count:,} differences | {same_count:,} identical"
+        all_diffs = diff_count + left_only_count + right_only_count
+        self._cached_stats_text = f"{total_files:,} files | {all_diffs:,} differences | {same_count:,} identical"
         self.lbl_stats.setText(self._cached_stats_text)
+        if hasattr(self, "lbl_summary_badges"):
+            self.lbl_summary_badges.setText(
+                f"<span style='color:#cf222e; font-weight:700;'>≠ {diff_count}</span>  "
+                f"<span style='color:#0969da; font-weight:700;'>← {left_only_count}</span>  "
+                f"<span style='color:#8250df; font-weight:700;'>→ {right_only_count}</span>  "
+                f"<span style='color:#1a7f37; font-weight:700;'>= {same_count}</span>"
+            )
         self.lbl_log.setText(f"● Comparison complete: {total_files:,} items evaluated.")
 
         if self.current_filter_mode != "all" or (hasattr(self, 'txt_explorer_search') and self.txt_explorer_search.text().strip()):
