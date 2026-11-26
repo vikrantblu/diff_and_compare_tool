@@ -25,7 +25,7 @@ from app.ui.widgets.editor_header import EditorHeader
 from app.ui.widgets.diff_connector import DiffConnectorWidget
 from app.ui.widgets.line_details_panel import LineDetailsPanel
 from app.core.diff_engine import DiffEngine, DiffChunk, AlignedDiffResult
-from app.core.file_io import read_text_file, write_text_file, is_vfs_path, is_docx_path
+from app.core.file_io import read_text_file, write_text_file, is_vfs_path, is_virtual_path, is_docx_path
 from app.core.git_staging import GitStagingManager
 from app.core.headless_reporter import HeadlessReporter
 from app.ui.styles.icons import get_line_icon
@@ -624,7 +624,7 @@ class DiffView(QWidget):
 
     def load_files(self, left_path: str = "", right_path: str = "", left_title: Optional[str] = None, right_title: Optional[str] = None):
         """Loads left and/or right files (including ArchiveVFS virtual paths and .docx) with encoding & EOL detection."""
-        if left_path and (is_vfs_path(left_path) or os.path.exists(left_path)):
+        if left_path and (is_virtual_path(left_path) or os.path.exists(left_path)):
             try:
                 content, enc, eol = read_text_file(left_path)
                 self._raw_left = content
@@ -636,7 +636,7 @@ class DiffView(QWidget):
             except Exception as e:
                 self._show_toast(f"Left read error: {e}", is_error=True)
 
-        if right_path and (is_vfs_path(right_path) or os.path.exists(right_path)):
+        if right_path and (is_virtual_path(right_path) or os.path.exists(right_path)):
             try:
                 content, enc, eol = read_text_file(right_path)
                 self._raw_right = content

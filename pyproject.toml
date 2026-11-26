@@ -50,6 +50,10 @@ build = [
 dev = [
     "pytest>=7.0.0"
 ]
+remote = [
+    "paramiko>=3.4.0",
+    "boto3>=1.34.0"
+]
 
 [project.urls]
 Homepage = "https://github.com/vikrantblu/diff_and_compare_tool"

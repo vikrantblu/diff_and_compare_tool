@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple, Set
 from app.core.diff_engine import DiffEngine
 from app.core.archive_vfs import ArchiveVFS
+from app.core.remote_vfs import RemoteVFS
 from app.core.file_io import is_vfs_path, read_vfs_or_file_bytes
 
 try:
@@ -142,20 +143,20 @@ class FolderCompareEngine:
         Recursively scans left_dir and right_dir, producing a hierarchical
         list of FolderCompareItem trees.
         """
-        left_exists = os.path.exists(left_dir) if left_dir else False
-        right_exists = os.path.exists(right_dir) if right_dir else False
+        left_exists = bool(left_dir) and (RemoteVFS.is_remote_path(left_dir) or os.path.exists(left_dir))
+        right_exists = bool(right_dir) and (RemoteVFS.is_remote_path(right_dir) or os.path.exists(right_dir))
 
         if not left_exists and not right_exists:
             return []
 
         # Collect files from left side
         if progress_callback:
-            progress_callback(0, f"Scanning left: {os.path.basename(left_dir)}...")
+            progress_callback(0, f"Scanning left: {os.path.basename(left_dir) or left_dir}...")
         left_entries = FolderCompareEngine._scan_target(left_dir, progress_callback, "Left", respect_gitignore=respect_gitignore)
 
         # Collect files from right side
         if progress_callback:
-            progress_callback(len(left_entries), f"Scanning right: {os.path.basename(right_dir)}...")
+            progress_callback(len(left_entries), f"Scanning right: {os.path.basename(right_dir) or right_dir}...")
         right_entries = FolderCompareEngine._scan_target(right_dir, progress_callback, "Right", respect_gitignore=respect_gitignore)
 
         # Merge all relative paths
@@ -240,12 +241,44 @@ class FolderCompareEngine:
 
     @staticmethod
     def _scan_target(target_path: str, progress_callback=None, label: str = "", respect_gitignore: bool = True) -> Dict[str, dict]:
-        """Scans on-disk directory or virtual archive, returning dict by rel_path."""
-        if not target_path or not os.path.exists(target_path):
+        """Scans remote URI (SFTP/S3/FTP), virtual archive, or on-disk directory, returning dict by rel_path."""
+        if not target_path:
             return {}
 
         entries: Dict[str, dict] = {}
         count = 0
+
+        # 0. Remote Virtual Filesystem (sftp://, s3://, ftp://, ftps://)
+        if RemoteVFS.is_remote_path(target_path):
+            base_uri = target_path.rstrip("/")
+            for entry in RemoteVFS.list_entries(target_path):
+                norm_p = entry.path.replace("\\", "/").strip("/")
+                if not norm_p:
+                    continue
+                parts = norm_p.split("/")
+                for depth in range(1, len(parts)):
+                    ancestor = "/".join(parts[:depth])
+                    if ancestor not in entries:
+                        entries[ancestor] = {
+                            "full_path": f"{base_uri}/{ancestor}",
+                            "is_dir": True,
+                            "size": 0,
+                            "mtime": entry.mtime,
+                        }
+                count += 1
+                entries[norm_p] = {
+                    "full_path": f"{base_uri}/{norm_p}",
+                    "is_dir": entry.is_dir,
+                    "size": entry.size,
+                    "mtime": entry.mtime,
+                }
+                if progress_callback and count % 250 == 0:
+                    progress_callback(count, f"Scanning remote ({label}): {count:,} items...")
+            return entries
+
+        if not os.path.exists(target_path):
+            return {}
+
         rules = FolderCompareEngine.load_ignore_rules(target_path) if respect_gitignore else []
 
         # 1. Virtual Archive VFS
@@ -331,8 +364,8 @@ class FolderCompareEngine:
 
     @staticmethod
     def _hash_path_or_vfs(path: str, algo: str) -> Optional[str]:
-        """Hashes either a disk file (via mmap/streaming) or an ArchiveVFS entry."""
-        if not is_vfs_path(path):
+        """Hashes a local file (via mmap/streaming), ArchiveVFS entry, or RemoteVFS file."""
+        if not is_vfs_path(path) and not RemoteVFS.is_remote_path(path):
             return DiffEngine.hash_file(path, algo)
         try:
             data = read_vfs_or_file_bytes(path)

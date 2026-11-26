@@ -44,11 +44,14 @@ def build():
         "fitz",
         "jsonpath_ng",
         "openpyxl",
-        "defusedxml"
+        "defusedxml",
+        "paramiko",
+        "boto3",
+        "botocore",
     ]
 
     cmd = [
-        "pyinstaller",
+        sys.executable, "-m", "PyInstaller",
         "--noconfirm",
         "--onedir",
         "--windowed",
@@ -67,19 +70,22 @@ def build():
     cmd.append("app/main.py")
 
     print("PyInstaller command:", " ".join(cmd))
-    try:
-        subprocess.check_call(cmd)
-        print(f"Build complete for {target}. Artifacts located in 'dist/diff_and_compare_{target}'.")
-    except Exception as e:
-        print(f"Build execution: {e}")
+    subprocess.check_call(cmd)
+    print(f"Build complete for {target}. Artifacts located in 'dist/diff_and_compare_{target}'.")
 
     if args.package:
-        # Ensure dist/diff_and_compare points to the built target
+        # Refresh dist/diff_and_compare cleanly from the newly compiled target directory
+        import shutil
         dist_base = os.path.join("dist", "diff_and_compare")
         target_dir = os.path.join("dist", f"diff_and_compare_{target}")
-        if os.path.isdir(target_dir) and not os.path.isdir(dist_base):
-            import shutil
+        if os.path.isdir(target_dir):
+            if os.path.isdir(dist_base):
+                shutil.rmtree(dist_base)
             shutil.copytree(target_dir, dist_base)
+            built_exe = os.path.join(dist_base, f"diff_and_compare_{target}.exe")
+            std_exe = os.path.join(dist_base, "diff_and_compare.exe")
+            if os.path.isfile(built_exe) and not os.path.isfile(std_exe):
+                shutil.copy2(built_exe, std_exe)
 
         from windows.package_installer import main as run_packager
         run_packager()

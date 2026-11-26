@@ -432,9 +432,9 @@
           <p>Extract text and tables from Word <code>.docx</code>, compare multi-page PDFs &amp; SVGs, and hover image canvases for live (X, Y) RGBA pixel delta coordinates.</p>
         </div>
         <div class="card">
-          <span class="tag">Folders &amp; Archives</span>
-          <h3>Flatten View, ±2s Tolerance &amp; Sync Hub</h3>
-          <p>Flatten nested hierarchies into one sortable list, handle FAT/SMB timestamp drift (±2s), browse ZIP/TAR virtual trees, and export HTML/CSV audits.</p>
+          <span class="tag">Folders, 3-Way Merge &amp; Remote</span>
+          <h3>3-Way Folder Merge, Flatten &amp; SFTP/S3</h3>
+          <p>Merge Mine, Base &amp; Theirs directories with conflict drill-down, flatten nested folders, handle ±2s skew, browse ZIP/TAR &amp; SFTP/S3/FTP profiles, and sync safely.</p>
         </div>
         <div class="card">
           <span class="tag">Developer Flow</span>
@@ -490,6 +490,8 @@
             <tr><td>2-Way Text + Line Details + Display Scope Filters</td><td class="yes">✓ Included</td><td class="yes">✓ Included</td><td>Partial</td><td class="yes">✓ Included</td></tr>
             <tr><td>3-Way Merge + Output Preview + Undo</td><td class="yes">✓ Included</td><td class="yes">✓ (Pro only)</td><td class="yes">✓ Included</td><td class="yes">✓ Included</td></tr>
             <tr><td>Folder Flatten, Archive VFS &amp; Recycle Bin Sync</td><td class="yes">✓ Included</td><td class="yes">✓ Included</td><td>Folder compare</td><td>Folder compare</td></tr>
+            <tr><td>True 3-Way Ancestor Folder Merge Studio</td><td class="yes">✓ Included</td><td class="yes">✓ (Pro only)</td><td class="yes">✓ Included</td><td class="no">—</td></tr>
+            <tr><td>Remote Filesystems (SFTP / S3 / FTP / FTPS)</td><td class="yes">✓ Profiles + VFS</td><td class="yes">✓ Included</td><td>Remote / Plugins</td><td class="no">—</td></tr>
             <tr><td>Tree-sitter AST Semantic Diff (Moved Symbols)</td><td class="yes">✓ Included</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
             <tr><td>API Contract Audit (OpenAPI, GraphQL, Protobuf)</td><td class="yes">✓ + CI JSON/HTML</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
             <tr><td>Word (.docx), Multi-Page PDF &amp; Image RGBA Inspector</td><td class="yes">✓ Included</td><td>Word plugin / basic image</td><td class="yes">✓ Included</td><td>Image/PDF (macOS)</td></tr>
@@ -594,8 +596,10 @@ git config --global mergetool.diff_and_compare.cmd "diff_and_compare.exe --merge
         ]
       },
       folder: {
-        title: "3. Dual-Tree Folder Compare, Archives VFS & Sync Hub",
+        title: "3. Dual-Tree Folder Compare, Archives VFS, Remote SFTP/S3 & 3-Way Folder Merge",
         bullets: [
+          "True 3-Way Folder Merge compares Mine, Base, and Theirs directories, flags conflicts vs safe auto-merges, and launches 3-Way Text Merge on any file.",
+          "Connect SFTP, Amazon S3 / MinIO, FTP, and FTPS profiles without storing plaintext passwords on disk.",
           "Flatten toggle merges subfolders into a single sortable list of relative paths.",
           "Size & Timestamp (±2s FAT/SMB/DST tolerance), BLAKE3, SHA-256, and Rules-Based modes.",
           "Browse .zip, .jar, .tar, .tgz, .tar.gz archives inline without extracting to disk.",

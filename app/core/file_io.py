@@ -8,6 +8,7 @@ import os
 import zipfile
 from typing import Tuple
 from app.core.archive_vfs import ArchiveVFS
+from app.core.remote_vfs import RemoteVFS
 
 try:
     import defusedxml.ElementTree as DET
@@ -82,6 +83,11 @@ def is_vfs_path(path: str) -> bool:
     return bool(inner) and ArchiveVFS.is_archive(archive_part)
 
 
+def is_virtual_path(path: str) -> bool:
+    """Returns True if path points inside an archive (#) or remote URI (sftp/s3/ftp/ftps)."""
+    return is_vfs_path(path) or RemoteVFS.is_remote_path(path)
+
+
 def split_vfs_path(path: str) -> Tuple[str, str]:
     """Splits a VFS path `archive.zip#inner/path` into `(archive_path, inner_entry_path)`."""
     if "#" not in path:
@@ -91,7 +97,9 @@ def split_vfs_path(path: str) -> Tuple[str, str]:
 
 
 def read_vfs_or_file_bytes(path: str) -> bytes:
-    """Reads raw bytes from either a local file or an ArchiveVFS virtual entry."""
+    """Reads raw bytes from a local file, ArchiveVFS entry, or RemoteVFS URI."""
+    if RemoteVFS.is_remote_path(path):
+        return RemoteVFS.read_file_bytes(path)
     if is_vfs_path(path):
         archive_part, inner = split_vfs_path(path)
         data = ArchiveVFS.read_entry_bytes(archive_part, inner)

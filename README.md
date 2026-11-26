@@ -37,7 +37,9 @@ A high-performance, cross-platform file comparison, 3-way merge, and multi-forma
    - 3 synchronized viewports: **Mine (Local)** | **Base (Ancestor)** | **Theirs (Remote)** + collapsible **4th Merged Output Preview** with standard diff3 conflict markers.
    - Resolution actions: `Accept Mine`, `Accept Theirs`, `Accept Base`, `Take Both`, `AI Resolve`, full resolution Undo stack, and honors CLI `--output` destination on save.
 
-3. **📁 Folder & Archive Comparison & Interactive Sync Hub**:
+3. **📁 Folder, 3-Way Folder Merge, Archive & Remote Comparison Suite**:
+   - **True 3-Way Folder Merge Studio**: Compares **Mine (Left)**, **Base (Ancestor)**, and **Theirs (Right)** trees, auto-resolves safe additions/deletions/modifications, flags true conflicts, lets you drill down into 3-Way Text Merge on any file, and writes the merged output cleanly.
+   - **Remote Filesystem Profiles (`sftp://`, `s3://`, `ftp://`, `ftps://`)**: Connect remote SSH/SFTP hosts, Amazon S3 / MinIO buckets, or FTP/FTPS servers directly in Folder Compare and open remote files side-by-side without saving plaintext passwords to disk.
    - **Flatten Folders Mode (`Flatten`)**: View all files across nested directory hierarchies in one sortable list by relative path.
    - **±2s Timestamp Tolerance & BLAKE3**: Handles FAT/SMB/DST timestamp skew alongside SHA-256, BLAKE3, and Rules-Based modes.
    - **Interactive Folder Sync Hub (`Sync Hub...`)**: Supports Mirror L->R, Bi-directional Sync, and Update Left/Right with per-row checkboxes and Windows Recycle Bin safe-delete support.
@@ -149,8 +151,8 @@ python build.py --target-arch arm64
 
 ## 🔮 Strategic Next-Phase Roadmap
 
-- **Remote Virtual Filesystem Adapters**: Streaming comparison across SSH/SFTP and S3-compatible buckets.
 - **Native Code Signing & Winget Distribution**: Signed Windows installer releases distributed via `winget`.
+- **WebAssembly / GitHub Action Marketplace Packaging**: Turnkey GitHub Action wrapper around headless `--folder-diff` and `--contract-diff` gates.
 - **Audio & Geospatial Studio Plugins**: Optional waveform spectral diffing and GeoJSON/Shapefile layer comparison.
 
 ---

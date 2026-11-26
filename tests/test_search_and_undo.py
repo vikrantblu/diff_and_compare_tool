@@ -19,8 +19,10 @@ class TestSearchAndUndo(unittest.TestCase):
         self.diff_view.show()
 
     def tearDown(self):
+        self.dir_view._cancel_worker()
         self.dir_view.close()
         self.diff_view.close()
+        QApplication.processEvents()
 
     def test_explorer_search_box_exists_and_filters(self):
         # 1. Search box in path bar exists

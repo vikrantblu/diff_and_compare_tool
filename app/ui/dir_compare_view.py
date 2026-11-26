@@ -24,9 +24,11 @@ from PySide6.QtGui import QColor, QFont, QBrush, QPainter, QKeySequence, QShortc
 from app.ui.styles.icons import get_line_icon
 from app.core.folder_compare_engine import FolderCompareEngine, FolderCompareItem
 from app.core.archive_vfs import ArchiveVFS
+from app.core.remote_vfs import RemoteVFS
 from app.core.file_io import is_vfs_path, read_vfs_or_file_bytes
 from app.core.headless_reporter import HeadlessReporter
 from app.ui.dialogs.folder_sync_dialog import FolderSyncDialog
+from app.ui.dialogs.remote_profile_dialog import RemoteProfileDialog
 
 
 class FolderCompareWorker(QThread):
@@ -180,6 +182,8 @@ class DirCompareView(QWidget):
         self._is_flattened = False
 
         self.setup_ui()
+        if QApplication.instance() is not None:
+            QApplication.instance().aboutToQuit.connect(self._cancel_worker)
         if self.current_filter_mode == "diffs":
             self.btn_filter_diffs.setChecked(True)
         self._load_initial_demo()
@@ -336,6 +340,13 @@ class DirCompareView(QWidget):
         rep_menu.addAction(get_line_icon("table", "#1a7f37"), "Export CSV Summary...", self._export_folder_csv)
         self.btn_export_report.setMenu(rep_menu)
         r_layout.addWidget(self.btn_export_report)
+
+        self.btn_remote = QPushButton(" Remote...")
+        self.btn_remote.setIcon(get_line_icon("globe", "#0969da"))
+        self.btn_remote.setFixedHeight(30)
+        self.btn_remote.setToolTip("Connect SFTP, S3, FTP, or FTPS remote folders to Left or Right")
+        self.btn_remote.clicked.connect(self._open_remote_dialog)
+        r_layout.addWidget(self.btn_remote)
 
         r_layout.addSpacing(4)
 
@@ -651,10 +662,10 @@ class DirCompareView(QWidget):
             self.lbl_stats.setText("0 files | 0 differences")
             return
 
-        if not os.path.exists(left):
+        if not RemoteVFS.is_remote_path(left) and not os.path.exists(left):
             self.lbl_log.setText(f"Left folder not found: {left}")
             return
-        if not os.path.exists(right):
+        if not RemoteVFS.is_remote_path(right) and not os.path.exists(right):
             self.lbl_log.setText(f"Right folder not found: {right}")
             return
 
@@ -679,12 +690,29 @@ class DirCompareView(QWidget):
             self.run_comparison()
 
     def _cancel_worker(self):
-        if self._worker and self._worker.isRunning():
-            self._worker.cancel()
-            self._worker.wait(800)
+        worker = self._worker
         self._worker = None
+        if worker is not None:
+            for sig in (worker.progress, worker.finished, worker.failed):
+                try:
+                    sig.disconnect()
+                except Exception:
+                    pass
+            if worker.isRunning():
+                worker.cancel()
+                worker.quit()
+                worker.wait(3000)
         self.progress_bar.setVisible(False)
         self.btn_cancel_comparison.setVisible(False)
+
+    def _open_remote_dialog(self):
+        dlg = RemoteProfileDialog(self)
+        if dlg.exec() and dlg.selected_uri:
+            if dlg.selected_side == "left":
+                self.txt_left_path.setText(dlg.selected_uri)
+            elif dlg.selected_side == "right":
+                self.txt_right_path.setText(dlg.selected_uri)
+            self.run_comparison()
 
     def _on_worker_progress(self, count: int, message: str):
         self.lbl_log.setText(f"● {message}")
@@ -1154,8 +1182,8 @@ class DirCompareView(QWidget):
 
         l_path = item.data(0, Qt.UserRole)
         r_path = item.data(1, Qt.UserRole)
-        l_ok = bool(l_path and (is_vfs_path(l_path) or os.path.isfile(l_path)))
-        r_ok = bool(r_path and (is_vfs_path(r_path) or os.path.isfile(r_path)))
+        l_ok = bool(l_path and (is_vfs_path(l_path) or RemoteVFS.is_remote_path(l_path) or os.path.isfile(l_path)))
+        r_ok = bool(r_path and (is_vfs_path(r_path) or RemoteVFS.is_remote_path(r_path) or os.path.isfile(r_path)))
         if l_ok or r_ok:
             self.openInDiffRequested.emit(l_path or "", r_path or "")
 

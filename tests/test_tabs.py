@@ -19,6 +19,7 @@ from app.ui.main_window import MainWindow
 from app.ui.image_diff_view import ImageDiffView
 from app.ui.diff_view import DiffView
 from app.ui.dir_compare_view import DirCompareView
+from app.ui.folder_merge_view import FolderMergeView
 from app.ui.tabular_diff_view import TabularDiffView
 from app.ui.structured_diff_view import StructuredDiffView
 from app.ui.hex_diff_view import HexDiffView
@@ -46,6 +47,7 @@ class TestTabLifecycle(unittest.TestCase):
         MainWindow._check_crash_recovery = self._orig_recovery
         SessionManager.get_storage_dir = self._orig_storage_dir
         shutil.rmtree(self._tmp_session_dir, ignore_errors=True)
+        QApplication.processEvents()
 
     def test_startup_has_only_home_tab(self):
         """At startup, only the Home dashboard tab should be open."""
@@ -83,7 +85,7 @@ class TestTabLifecycle(unittest.TestCase):
         """Every session mode must open a functional tab when triggered from Home."""
         modes = [
             ("folder", DirCompareView),
-            ("folder_merge", DirCompareView),
+            ("folder_merge", FolderMergeView),
             ("folder_sync", DirCompareView),
             ("text", DiffView),
             ("merge", MergeView),

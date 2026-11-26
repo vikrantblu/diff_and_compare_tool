@@ -25,6 +25,7 @@ from app.ui.home_view import HomeView
 from app.ui.diff_view import DiffView
 from app.ui.merge_view import MergeView
 from app.ui.dir_compare_view import DirCompareView
+from app.ui.folder_merge_view import FolderMergeView
 from app.ui.image_diff_view import ImageDiffView
 from app.ui.tabular_diff_view import TabularDiffView
 from app.ui.structured_diff_view import StructuredDiffView
@@ -32,12 +33,14 @@ from app.ui.hex_diff_view import HexDiffView
 from app.ui.dialogs.session_dialog import SessionProfileDialog
 from app.ui.dialogs.command_palette import CommandPaletteDialog
 from app.ui.dialogs.git_changes_dialog import GitChangesDialog
+from app.ui.dialogs.remote_profile_dialog import RemoteProfileDialog
 
 from app.ui.styles.theme import MODERN_LIGHT_QSS
 from app.ui.styles.icons import get_line_icon, get_app_icon
 from app.ui.styles.windows_effects import apply_windows_material, BACKDROP_MICA_ALT
 from app.core.session_manager import SessionManager
 from app.core.archive_vfs import ArchiveVFS
+from app.core.remote_vfs import RemoteVFS
 from app.core.file_io import is_vfs_path, is_docx_path, read_text_file
 from app.core.git_staging import GitStagingManager
 from app.core.shell_integration import install_context_menu, uninstall_context_menu
@@ -57,6 +60,10 @@ class MainWindow(QMainWindow):
     @property
     def dir_compare_tab(self) -> DirCompareView:
         return self._get_or_create_tab(DirCompareView, "folder")
+
+    @property
+    def folder_merge_tab(self) -> FolderMergeView:
+        return self._get_or_create_tab(FolderMergeView, "folder_merge")
 
     @property
     def image_tab(self) -> ImageDiffView:
@@ -135,7 +142,8 @@ class MainWindow(QMainWindow):
         new_menu = QMenu(self)
         new_menu.addAction(get_line_icon("diff", "#0969da"), "Text & Code Comparison").triggered.connect(lambda: self.add_new_tab("text"))
         new_menu.addAction(get_line_icon("git-merge", "#1a7f37"), "3-Way Merge Studio").triggered.connect(lambda: self.add_new_tab("merge"))
-        new_menu.addAction(get_line_icon("folder", "#0969da"), "Folder / Archive Comparison").triggered.connect(lambda: self.add_new_tab("folder"))
+        new_menu.addAction(get_line_icon("folder", "#0969da"), "Folder / Archive / Remote Comparison").triggered.connect(lambda: self.add_new_tab("folder"))
+        new_menu.addAction(get_line_icon("folder-merge", "#b45309"), "3-Way Folder Merge Studio").triggered.connect(lambda: self.add_new_tab("folder_merge"))
         new_menu.addAction(get_line_icon("image", "#8250df"), "Image & PDF Diff").triggered.connect(lambda: self.add_new_tab("image"))
         new_menu.addAction(get_line_icon("table", "#1a7f37"), "Tabular / CSV Spreadsheet Diff").triggered.connect(lambda: self.add_new_tab("table"))
         new_menu.addAction(get_line_icon("code", "#cf222e"), "Structured Data (JSON/YAML/XML)").triggered.connect(lambda: self.add_new_tab("structured"))
@@ -226,6 +234,15 @@ class MainWindow(QMainWindow):
                 and not w.txt_left_path.text().strip()
                 and not w.txt_right_path.text().strip()
             )
+        elif isinstance(w, FolderMergeView):
+            return (
+                not getattr(w, "left_dir", "")
+                and not getattr(w, "base_dir", "")
+                and not getattr(w, "right_dir", "")
+                and not w.txt_left.text().strip()
+                and not w.txt_base.text().strip()
+                and not w.txt_right.text().strip()
+            )
         elif isinstance(w, ImageDiffView):
             return not getattr(w, "left_path", None) and not getattr(w, "right_path", None)
         elif isinstance(w, TabularDiffView):
@@ -275,17 +292,25 @@ class MainWindow(QMainWindow):
             title = " 3-Way Merge" if count == 0 else f" Merge ({count + 1})"
             idx = self.tabs.addTab(w, get_line_icon("git-merge", "#1a7f37"), title)
             self.tabs.setTabToolTip(idx, "3-Way Ancestor Conflict Resolution Merge Studio")
-        elif mode in ("folder", "folder_merge", "folder_sync"):
+        elif mode == "folder_merge":
+            w = FolderMergeView()
+            w.open3WayFileMergeRequested.connect(self.open_3way_merge)
+            w.homeRequested.connect(self.show_home_tab)
+            count = self._count_tabs(FolderMergeView)
+            title = " 3-Way Folder Merge" if count == 0 else f" Folder Merge ({count + 1})"
+            idx = self.tabs.addTab(w, get_line_icon("folder-merge", "#b45309"), title)
+            self.tabs.setTabToolTip(idx, "True Ancestor-Based 3-Way Folder Merge Studio")
+        elif mode in ("folder", "folder_sync"):
             w = DirCompareView(initial_mode=mode)
             w.openInDiffRequested.connect(self.smart_open_comparison)
             w.homeRequested.connect(self.show_home_tab)
             count = self._count_tabs(DirCompareView)
-            base_title = " Folders & VFS" if mode == "folder" else (" Folder Merge" if mode == "folder_merge" else " Folder Sync")
-            icon_name = "folder" if mode == "folder" else ("folder-merge" if mode == "folder_merge" else "folder-sync")
-            icon_color = "#0969da" if mode == "folder" else ("#b45309" if mode == "folder_merge" else "#059669")
+            base_title = " Folders & VFS" if mode == "folder" else " Folder Sync"
+            icon_name = "folder" if mode == "folder" else "folder-sync"
+            icon_color = "#0969da" if mode == "folder" else "#059669"
             title = base_title if count == 0 else f"{base_title} ({count + 1})"
             idx = self.tabs.addTab(w, get_line_icon(icon_name, icon_color), title)
-            self.tabs.setTabToolTip(idx, "Dual-Tree Directory & Virtual Archive Comparison")
+            self.tabs.setTabToolTip(idx, "Dual-Tree Directory, Virtual Archive & Remote Comparison")
         elif mode == "image":
             w = ImageDiffView()
             count = self._count_tabs(ImageDiffView)
@@ -345,7 +370,7 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.Yes:
                 return
 
-        if isinstance(w, DirCompareView):
+        if isinstance(w, (DirCompareView, FolderMergeView)):
             w._cancel_worker()
 
         if hasattr(w, "wal") and w.wal:
@@ -381,6 +406,11 @@ class MainWindow(QMainWindow):
             elif isinstance(w, DirCompareView):
                 tab_info["left_path"] = w.txt_left_path.text().strip()
                 tab_info["right_path"] = w.txt_right_path.text().strip()
+            elif isinstance(w, FolderMergeView):
+                tab_info["left_path"] = w.txt_left.text().strip()
+                tab_info["base_path"] = w.txt_base.text().strip()
+                tab_info["right_path"] = w.txt_right.text().strip()
+                tab_info["output_path"] = w.txt_output.text().strip()
             elif isinstance(w, ImageDiffView):
                 tab_info["left_path"] = getattr(w, "left_path", "") or ""
                 tab_info["right_path"] = getattr(w, "right_path", "") or ""
@@ -417,6 +447,13 @@ class MainWindow(QMainWindow):
                 self.open_file_diff(l_path or "", r_path or "")
             elif t_name == "DirCompareView" and (l_path or r_path):
                 self.open_folder_diff(l_path or "", r_path or "")
+            elif t_name == "FolderMergeView" and (l_path or r_path or tab_info.get("base_path")):
+                self.open_folder_merge(
+                    l_path or "",
+                    tab_info.get("base_path", ""),
+                    r_path or "",
+                    tab_info.get("output_path", ""),
+                )
             elif t_name == "ImageDiffView" and (l_path or r_path):
                 self.open_image_diff(l_path or "", r_path or "")
             elif t_name == "TabularDiffView" and (l_path or r_path):
@@ -512,7 +549,7 @@ class MainWindow(QMainWindow):
 
         for i in range(self.tabs.count()):
             w = self.tabs.widget(i)
-            if isinstance(w, DirCompareView):
+            if isinstance(w, (DirCompareView, FolderMergeView)):
                 w._cancel_worker()
             if hasattr(w, "wal") and w.wal:
                 try:
@@ -531,6 +568,7 @@ class MainWindow(QMainWindow):
         menu_session.addAction(get_line_icon("diff", "#0969da"), "New 2-Way Text Diff").triggered.connect(lambda: self.add_new_tab("text"))
         menu_session.addAction(get_line_icon("git-merge", "#1a7f37"), "New 3-Way Merge").triggered.connect(lambda: self.add_new_tab("merge"))
         menu_session.addAction(get_line_icon("folder", "#0969da"), "New Folder Compare").triggered.connect(lambda: self.add_new_tab("folder"))
+        menu_session.addAction(get_line_icon("folder-merge", "#b45309"), "New 3-Way Folder Merge").triggered.connect(lambda: self.add_new_tab("folder_merge"))
         menu_session.addAction(get_line_icon("image", "#8250df"), "New Image & PDF Diff").triggered.connect(lambda: self.add_new_tab("image"))
         menu_session.addAction(get_line_icon("table", "#1a7f37"), "New Table & CSV Diff").triggered.connect(lambda: self.add_new_tab("table"))
         menu_session.addAction(get_line_icon("code", "#cf222e"), "New Structured Tree Diff").triggered.connect(lambda: self.add_new_tab("structured"))
@@ -543,6 +581,7 @@ class MainWindow(QMainWindow):
         menu_tools = menubar.addMenu("&Tools")
         menu_tools.addAction(get_line_icon("command", "#0969da"), "Command Palette... (Ctrl+K)").triggered.connect(self.open_command_palette)
         menu_tools.addAction(get_line_icon("git-branch", "#1a7f37"), "Browse Git Working Changes... (Ctrl+G)").triggered.connect(self.open_git_changes_browser)
+        menu_tools.addAction(get_line_icon("globe", "#0969da"), "Remote Profiles (SFTP / S3 / FTP)...").triggered.connect(self._open_remote_profiles_dialog)
         menu_tools.addAction(get_line_icon("clipboard", "#0969da"), "Compare Clipboard in Text Studio").triggered.connect(self._compare_clipboard)
         menu_tools.addSeparator()
         menu_tools.addAction(get_line_icon("terminal", "#475569"), "Configure as Git Difftool & Mergetool...").triggered.connect(self._configure_git_tools)
@@ -581,7 +620,7 @@ class MainWindow(QMainWindow):
         if mode_id == "folder":
             self.open_folder_diff(mode="folder")
         elif mode_id == "folder_merge":
-            self.open_folder_diff(mode="folder_merge")
+            self.open_folder_merge()
         elif mode_id == "folder_sync":
             self.open_folder_diff(mode="folder_sync")
         elif mode_id == "text":
@@ -602,6 +641,10 @@ class MainWindow(QMainWindow):
     def smart_open_comparison(self, left_path: str, right_path: str, left_title: str = None, right_title: str = None):
         """Intelligently detects file types and opens the corresponding comparison studio."""
         if not left_path and not right_path:
+            return
+
+        if RemoteVFS.is_remote_path(left_path or "") or RemoteVFS.is_remote_path(right_path or ""):
+            self.open_folder_diff(left_path, right_path)
             return
 
         if not is_vfs_path(left_path or "") and not is_vfs_path(right_path or ""):
@@ -634,6 +677,8 @@ class MainWindow(QMainWindow):
             ("New 2-Way Text & Code Diff", "Studio", "", lambda: self.add_new_tab("text")),
             ("New 3-Way Merge Studio", "Studio", "", lambda: self.add_new_tab("merge")),
             ("New Folder / Archive Comparison", "Studio", "", lambda: self.add_new_tab("folder")),
+            ("New 3-Way Folder Merge Studio", "Studio", "", lambda: self.add_new_tab("folder_merge")),
+            ("Connect Remote Profile (SFTP / S3 / FTP)", "Remote", "", self._open_remote_profiles_dialog),
             ("New Image & PDF Visual Diff", "Studio", "", lambda: self.add_new_tab("image")),
             ("New Tabular / Spreadsheet Diff", "Studio", "", lambda: self.add_new_tab("table")),
             ("New Structured Data Tree Diff (JSON/YAML/XML)", "Studio", "", lambda: self.add_new_tab("structured")),
@@ -756,6 +801,25 @@ class MainWindow(QMainWindow):
             self._update_widget_tab_title(tab, left_path, right_path, " Folders & VFS")
             self._record_recent(left_path, right_path, mode)
         return tab
+
+    def open_folder_merge(self, left_path: str = "", base_path: str = "", right_path: str = "", output_path: str = "") -> FolderMergeView:
+        tab = self._get_or_create_tab(FolderMergeView, "folder_merge")
+        self.tabs.setCurrentWidget(tab)
+        if left_path or base_path or right_path:
+            tab.set_directories(left_path, base_path, right_path, output_path)
+            self._update_widget_tab_title(tab, left_path, right_path, " 3-Way Folder Merge")
+        return tab
+
+    def _open_remote_profiles_dialog(self):
+        dlg = RemoteProfileDialog(self)
+        if dlg.exec() and dlg.selected_uri:
+            tab = self.open_folder_diff(mode="folder")
+            if dlg.selected_side == "left":
+                tab.txt_left_path.setText(dlg.selected_uri)
+            else:
+                tab.txt_right_path.setText(dlg.selected_uri)
+            if tab.txt_left_path.text().strip() and tab.txt_right_path.text().strip():
+                tab.run_comparison()
 
     def open_structured_diff(self, left_path: str = "", right_path: str = "") -> StructuredDiffView:
         tab = self._get_or_create_tab(StructuredDiffView, "structured")

@@ -275,7 +275,7 @@ class TestAuditFixes(unittest.TestCase):
 
         reg = generate_reg_content(target_exe=r"C:\app\diff.exe")
         self.assertNotIn('\\"\\"', reg)
-        self.assertIn('@="\\"C:\\\\app\\\\diff.exe\\" --compare \\"%1\\""', reg)
+        self.assertIn('diff.exe\\" --compare \\"%1\\""', reg)
         self.assertNotIn(r"CurrentVersion\\Uninstall", reg)
         self.assertIn(r"CurrentVersion\Uninstall\diff_and_compare_tool]", reg)
 

@@ -36,6 +36,10 @@ class SessionManager:
         return os.path.join(cls.get_storage_dir(), "custom_rules.json")
 
     @classmethod
+    def get_remote_profiles_file(cls) -> str:
+        return os.path.join(cls.get_storage_dir(), "remote_profiles.json")
+
+    @classmethod
     def save_session(cls, tabs_data: List[Dict[str, Any]], active_tab_index: int = 0) -> bool:
         """Saves current open tabs to disk for automatic session restoration."""
         try:
@@ -175,5 +179,50 @@ class SessionManager:
             with open(cls.get_custom_rules_file(), "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2)
             return True
+        except Exception:
+            return False
+
+    @classmethod
+    def get_remote_profiles(cls) -> Dict[str, Dict[str, Any]]:
+        """Loads saved remote SFTP/S3/FTP connection profiles (secrets excluded)."""
+        filepath = cls.get_remote_profiles_file()
+        if not os.path.exists(filepath):
+            return {}
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    @classmethod
+    def save_remote_profile(cls, name: str, cfg: Dict[str, Any]) -> bool:
+        """Saves a named remote profile while stripping any raw password keys from disk."""
+        clean_name = (name or "").strip()
+        if not clean_name:
+            return False
+        try:
+            profiles = cls.get_remote_profiles()
+            # Never persist plaintext passwords to disk; use key_path, password_env, aws_profile, or session secret
+            sanitized = {k: v for k, v in cfg.items() if k != "password"}
+            sanitized["name"] = clean_name
+            profiles[clean_name] = sanitized
+            with open(cls.get_remote_profiles_file(), "w", encoding="utf-8") as f:
+                json.dump(profiles, f, indent=2)
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def delete_remote_profile(cls, name: str) -> bool:
+        """Deletes a named remote connection profile."""
+        try:
+            profiles = cls.get_remote_profiles()
+            if name in profiles:
+                del profiles[name]
+                with open(cls.get_remote_profiles_file(), "w", encoding="utf-8") as f:
+                    json.dump(profiles, f, indent=2)
+                return True
+            return False
         except Exception:
             return False
