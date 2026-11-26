@@ -115,6 +115,20 @@ class DiffView(QWidget):
 
         self.run_diff()
 
+    def closeEvent(self, event):
+        try:
+            self._toast_timer.stop()
+            watched = self._file_watcher.files()
+            if watched:
+                self._file_watcher.removePaths(watched)
+            self.left_editor.close()
+            self.right_editor.close()
+            if hasattr(self, "wal") and self.wal:
+                self.wal.clean_exit()
+        except Exception:
+            pass
+        super().closeEvent(event)
+
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)

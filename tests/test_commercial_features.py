@@ -3,6 +3,7 @@ Comprehensive Test Suite for Commercial-Grade Diff & Compare Enhancements (White
 """
 
 import csv
+import gc
 import os
 import shutil
 import subprocess
@@ -14,8 +15,6 @@ from PIL import Image
 from PySide6.QtWidgets import QApplication
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-app = QApplication.instance() or QApplication(sys.argv)
 
 from app.core.file_io import is_docx_path, extract_docx_text, read_text_file, write_text_file
 from app.core.folder_compare_engine import FolderCompareEngine
@@ -55,6 +54,10 @@ def _make_minimal_docx(path: str, paragraphs: list, table_rows: list = None):
 
 class TestCommercialFeatures(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        QApplication.instance() or QApplication(sys.argv)
+
     def setUp(self):
         self._tmp_session_dir = tempfile.mkdtemp()
         self._orig_storage_dir = SessionManager.get_storage_dir
@@ -66,6 +69,14 @@ class TestCommercialFeatures(unittest.TestCase):
         MainWindow._check_crash_recovery = self._orig_recovery
         SessionManager.get_storage_dir = self._orig_storage_dir
         shutil.rmtree(self._tmp_session_dir, ignore_errors=True)
+        QApplication.sendPostedEvents()
+        QApplication.processEvents()
+
+    @classmethod
+    def tearDownClass(cls):
+        gc.collect()
+        QApplication.sendPostedEvents()
+        QApplication.processEvents()
 
     def test_docx_extraction_and_routing(self):
         with tempfile.TemporaryDirectory() as td:

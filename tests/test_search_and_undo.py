@@ -1,9 +1,8 @@
+import gc
 import unittest
 import sys
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
-
-app = QApplication.instance() or QApplication(sys.argv)
 
 from app.ui.dir_compare_view import DirCompareView
 from app.ui.diff_view import DiffView
@@ -11,6 +10,10 @@ from app.core.diff_engine import DiffEngine
 
 
 class TestSearchAndUndo(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        QApplication.instance() or QApplication(sys.argv)
 
     def setUp(self):
         self.dir_view = DirCompareView()
@@ -22,6 +25,17 @@ class TestSearchAndUndo(unittest.TestCase):
         self.dir_view._cancel_worker()
         self.dir_view.close()
         self.diff_view.close()
+        self.dir_view.deleteLater()
+        self.diff_view.deleteLater()
+        self.dir_view = None
+        self.diff_view = None
+        QApplication.sendPostedEvents()
+        QApplication.processEvents()
+
+    @classmethod
+    def tearDownClass(cls):
+        gc.collect()
+        QApplication.sendPostedEvents()
         QApplication.processEvents()
 
     def test_explorer_search_box_exists_and_filters(self):

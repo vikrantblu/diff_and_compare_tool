@@ -4,6 +4,7 @@ Ensures comparison studios open correctly from Home cards, can be closed,
 and can be reopened without failing.
 """
 
+import gc
 import os
 import shutil
 import sys
@@ -30,7 +31,7 @@ class TestTabLifecycle(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.app = QApplication.instance() or QApplication([])
+        QApplication.instance() or QApplication([])
 
     def setUp(self):
         # Isolate SessionManager so tests never read or pollute user session state
@@ -44,9 +45,18 @@ class TestTabLifecycle(unittest.TestCase):
 
     def tearDown(self):
         self.win.close()
+        self.win.deleteLater()
+        self.win = None
         MainWindow._check_crash_recovery = self._orig_recovery
         SessionManager.get_storage_dir = self._orig_storage_dir
         shutil.rmtree(self._tmp_session_dir, ignore_errors=True)
+        QApplication.sendPostedEvents()
+        QApplication.processEvents()
+
+    @classmethod
+    def tearDownClass(cls):
+        gc.collect()
+        QApplication.sendPostedEvents()
         QApplication.processEvents()
 
     def test_startup_has_only_home_tab(self):

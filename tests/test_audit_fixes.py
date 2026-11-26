@@ -2,6 +2,7 @@
 Regression & Integration Test Suite for Audit Fixes and Enhancements (White Mode Only).
 """
 
+import gc
 import json
 import os
 import shutil
@@ -12,8 +13,6 @@ import zipfile
 from PySide6.QtWidgets import QApplication
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-app = QApplication.instance() or QApplication(sys.argv)
 
 from app.core.diff_engine import DiffEngine, NOISE_REGEX_PRESETS
 from app.core.folder_compare_engine import FolderCompareEngine
@@ -37,6 +36,10 @@ from app.ui.image_diff_view import ImageDiffView
 
 class TestAuditFixes(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        QApplication.instance() or QApplication(sys.argv)
+
     def setUp(self):
         self._tmp_session_dir = tempfile.mkdtemp()
         self._orig_storage_dir = SessionManager.get_storage_dir
@@ -48,6 +51,14 @@ class TestAuditFixes(unittest.TestCase):
         MainWindow._check_crash_recovery = self._orig_recovery
         SessionManager.get_storage_dir = self._orig_storage_dir
         shutil.rmtree(self._tmp_session_dir, ignore_errors=True)
+        QApplication.sendPostedEvents()
+        QApplication.processEvents()
+
+    @classmethod
+    def tearDownClass(cls):
+        gc.collect()
+        QApplication.sendPostedEvents()
+        QApplication.processEvents()
 
     def test_aligned_diff_preserves_moved_blocks_and_raw_coords(self):
         t_left = "blockA\nblockB\nblockC\ncommon\n"

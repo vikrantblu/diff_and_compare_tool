@@ -237,6 +237,17 @@ class ImageDiffView(QWidget):
 
         self.setup_ui()
 
+    def closeEvent(self, event):
+        try:
+            self.blink_timer.stop()
+            if hasattr(self, "txt_left"):
+                self.txt_left.close()
+            if hasattr(self, "txt_right"):
+                self.txt_right.close()
+        except Exception:
+            pass
+        super().closeEvent(event)
+
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

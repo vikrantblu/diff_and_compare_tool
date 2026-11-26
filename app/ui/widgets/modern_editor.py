@@ -781,3 +781,12 @@ class ModernCodeEditor(QPlainTextEdit):
                 event.acceptProposedAction()
                 return
         super().dropEvent(event)
+
+    def closeEvent(self, event):
+        try:
+            self.debounce_timer.stop()
+            if hasattr(self, "highlighter") and self.highlighter is not None:
+                self.highlighter.setDocument(None)
+        except Exception:
+            pass
+        super().closeEvent(event)

@@ -380,6 +380,11 @@ class MainWindow(QMainWindow):
                 pass
 
         self.tabs.removeTab(index)
+        try:
+            w.close()
+            w.deleteLater()
+        except Exception:
+            pass
         self._update_tab_close_buttons()
 
     def _open_profiles_dialog(self):
@@ -556,6 +561,12 @@ class MainWindow(QMainWindow):
                     w.wal.clean_exit()
                 except Exception:
                     pass
+            try:
+                w.close()
+                if w is not self.home_tab:
+                    w.deleteLater()
+            except Exception:
+                pass
 
         super().closeEvent(event)
 
