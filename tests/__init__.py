@@ -7,12 +7,14 @@ import gc
 def _cleanup_qt_on_exit() -> None:
     """Release QApplication deterministically before Py_FinalizeEx to prevent PySide6 shutdown crashes."""
     try:
+        from PySide6.QtGui import QPixmapCache
         from PySide6.QtWidgets import QApplication
         app = QApplication.instance()
         if app is not None:
             app.closeAllWindows()
             QApplication.sendPostedEvents()
             QApplication.processEvents()
+            QPixmapCache.clear()
             gc.collect()
             QApplication.sendPostedEvents()
             QApplication.processEvents()
