@@ -12,7 +12,7 @@
 ![Application Status](https://img.shields.io/badge/Platform-Windows%2011%20x64%20Standalone-blue)
 ![Python](https://img.shields.io/badge/Python-3.11+-brightgreen)
 ![Framework](https://img.shields.io/badge/UI-PySide6%20Qt6-blueviolet)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-vikrantblu%2Fdiff__and__compare__tool-blue?logo=github)](https://github.com/vikrantblu/diff_and_compare_tool)
 [![Discussions](https://img.shields.io/badge/Discussions-Join%20Chat-teal?logo=github)](https://github.com/vikrantblu/diff_and_compare_tool/discussions)
 [![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=github-sponsors)](https://github.com/sponsors/vikrantblu)
@@ -216,7 +216,7 @@ Contributions are welcomed!
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [GNU General Public License v3.0 (GPLv3)](LICENSE) with trademark reservations for the *Diff & Compare Pro* brand and assets.
 
 
 

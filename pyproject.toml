@@ -7,7 +7,7 @@ name = "diff-and-compare-tool"
 version = "1.1.0"
 description = "Next-Gen Multi-Format Diff, 3-Way Merge & Synchronization Desktop Suite"
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "GPL-3.0-or-later" }
 authors = [
     { name = "vikrantblu" }
 ]
@@ -18,7 +18,7 @@ classifiers = [
     "Environment :: Win32 (MS Windows)",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
