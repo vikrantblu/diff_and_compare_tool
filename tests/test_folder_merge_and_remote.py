@@ -251,9 +251,15 @@ class TestFolderMergeAndRemote(unittest.TestCase):
             self.assertFalse(ic.isNull(), f"Null badge icon for {mode_id}")
 
         win = MainWindow()
-        self.assertIn("Diff & Compare Pro", win.windowTitle())
-        win.close()
-        win.deleteLater()
+        try:
+            self.assertIn("Diff & Compare Pro", win.windowTitle())
+        finally:
+            win.close()
+            win.deleteLater()
+            del win
+            gc.collect()
+            QApplication.sendPostedEvents()
+            QApplication.processEvents()
 
         hv = HomeView()
         try:
