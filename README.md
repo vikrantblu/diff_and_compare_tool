@@ -77,6 +77,14 @@
 
 ## 🚀 Quickstart & Installation
 
+Prerequisites
+Before getting started, review the following requirements:
+
+Standalone Windows installer: Designed for Microsoft Windows and does not require a separate Python installation.
+Running from source: Requires Python 3.10 or later.
+Python dependencies: Install the required packages listed in requirements.txt.
+Source-based setup: Ensure Python and pip are available in your environment before installing the project dependencies.
+
 ### 1. Windows Installation (Double-Click Setup EXE)
 - **Double-Click Standalone Installer**:
   Run [`dist/Setup_diff_and_compare_tool.exe`](file:///D:/myrepo/diff_and_compare_tool/dist/Setup_diff_and_compare_tool.exe)
