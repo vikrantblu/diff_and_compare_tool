@@ -1,8 +1,13 @@
 import gc
+import os
 import unittest
 import sys
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from tests import ensure_qapp, cleanup_qt_widgets
 
 from app.ui.dir_compare_view import DirCompareView
 from app.ui.diff_view import DiffView
@@ -13,7 +18,7 @@ class TestSearchAndUndo(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        QApplication.instance() or QApplication(sys.argv)
+        ensure_qapp()
 
     def setUp(self):
         self.dir_view = DirCompareView()
@@ -29,14 +34,11 @@ class TestSearchAndUndo(unittest.TestCase):
         self.diff_view.deleteLater()
         self.dir_view = None
         self.diff_view = None
-        QApplication.sendPostedEvents()
-        QApplication.processEvents()
+        cleanup_qt_widgets()
 
     @classmethod
     def tearDownClass(cls):
-        gc.collect()
-        QApplication.sendPostedEvents()
-        QApplication.processEvents()
+        cleanup_qt_widgets()
 
     def test_explorer_search_box_exists_and_filters(self):
         # 1. Search box in path bar exists

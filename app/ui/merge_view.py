@@ -88,6 +88,17 @@ class MergeView(QWidget):
 
         self.recompute_merge()
 
+    def closeEvent(self, event):
+        """Ensure child editors stop timers and detach syntax highlighters on close."""
+        try:
+            for attr in ("editor_mine", "editor_base", "editor_theirs", "editor_output"):
+                ed = getattr(self, attr, None)
+                if ed is not None:
+                    ed.close()
+        except Exception:
+            pass
+        super().closeEvent(event)
+
     @staticmethod
     def _set_editor_text_quiet(editor: ModernCodeEditor, text: str):
         editor._programmatic_change = True

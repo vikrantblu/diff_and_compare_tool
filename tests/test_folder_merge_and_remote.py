@@ -13,6 +13,8 @@ from PySide6.QtWidgets import QApplication
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from tests import ensure_qapp, cleanup_qt_widgets
+
 from app.core.file_io import read_text_file
 from app.core.folder_compare_engine import FolderCompareEngine
 from app.core.folder_merge_engine import FolderMergeEngine
@@ -60,7 +62,7 @@ class TestFolderMergeAndRemote(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        QApplication.instance() or QApplication(sys.argv)
+        ensure_qapp()
 
     def setUp(self):
         self._tmp_session_dir = tempfile.mkdtemp()
@@ -74,14 +76,11 @@ class TestFolderMergeAndRemote(unittest.TestCase):
         MainWindow._check_crash_recovery = self._orig_recovery
         SessionManager.get_storage_dir = self._orig_storage_dir
         shutil.rmtree(self._tmp_session_dir, ignore_errors=True)
-        QApplication.sendPostedEvents()
-        QApplication.processEvents()
+        cleanup_qt_widgets()
 
     @classmethod
     def tearDownClass(cls):
-        gc.collect()
-        QApplication.sendPostedEvents()
-        QApplication.processEvents()
+        cleanup_qt_widgets()
 
     def test_3way_folder_merge_all_classifications_and_execution(self):
         with tempfile.TemporaryDirectory() as td:

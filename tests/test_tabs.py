@@ -15,6 +15,8 @@ from PySide6.QtWidgets import QApplication, QTabBar
 # Ensure repo root is on sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from tests import ensure_qapp, cleanup_qt_widgets
+
 from app.core.session_manager import SessionManager
 from app.ui.main_window import MainWindow
 from app.ui.image_diff_view import ImageDiffView
@@ -31,7 +33,7 @@ class TestTabLifecycle(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        QApplication.instance() or QApplication([])
+        ensure_qapp()
 
     def setUp(self):
         # Isolate SessionManager so tests never read or pollute user session state
@@ -50,14 +52,11 @@ class TestTabLifecycle(unittest.TestCase):
         MainWindow._check_crash_recovery = self._orig_recovery
         SessionManager.get_storage_dir = self._orig_storage_dir
         shutil.rmtree(self._tmp_session_dir, ignore_errors=True)
-        QApplication.sendPostedEvents()
-        QApplication.processEvents()
+        cleanup_qt_widgets()
 
     @classmethod
     def tearDownClass(cls):
-        gc.collect()
-        QApplication.sendPostedEvents()
-        QApplication.processEvents()
+        cleanup_qt_widgets()
 
     def test_startup_has_only_home_tab(self):
         """At startup, only the Home dashboard tab should be open."""
